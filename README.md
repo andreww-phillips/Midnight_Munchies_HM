@@ -11,7 +11,7 @@
   - PostgreSQL (Supabase)
   - Java
   - JavaScript
-  - Node.js
+  - React.js
   - Springboot 
 
 ## Product Overview:
