@@ -1,10 +1,15 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
+const API_URL = "http://localhost:8080/api/auth";
 
 export default function RegistrationPage() {
+  const [isLogin, setIsLogin] = useState(true);
+  const [user, setUser] = useState(null);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     role: "",
-    email: "",
+    username: "",
     password: "",
     // Role-specific fields
     first_name: "",
@@ -18,6 +23,17 @@ export default function RegistrationPage() {
     logo: null
   });
 
+  useEffect(() => {
+    fetch(`${API_URL}/me`, { credentials: "include" })
+      .then((response) => {
+        if (response.ok) {
+          return response.json().then(setUser);
+        }
+        return null;
+      })
+      .catch(() => setError("Unable to connect to the authentication service."));
+  }, []);
+
   // Handle standard text/select inputs
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -29,26 +45,63 @@ export default function RegistrationPage() {
 
   // Handle file inputs separately
   const handleFileChange = (e) => {
-    const file = e.target.files[0]; // Get the first uploaded file
+    const { name, files } = e.target;
     setFormData((prev) => ({
       ...prev,
-      logo: file,
+      [name]: files[0],
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting profile & logo file:', formData);
-    // Next step: Upload formData.logo to Supabase Storage bucket
+    setError("");
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${API_URL}/${isLogin ? "login" : "register"}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password,
+          role: formData.role ? formData.role.toUpperCase() : null
+        })
+      });
+      if (!response.ok) {
+        setError(isLogin ? "Invalid username or password." : "Registration could not be completed.");
+        return;
+      }
+      setUser(await response.json());
+    } catch {
+      setError("Unable to connect to the authentication service.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const handleLogout = async () => {
+    await fetch(`${API_URL}/logout`, { method: "POST", credentials: "include" });
+    setUser(null);
+    setError("");
+  };
+
+  if (user) {
+    return (
+      <main>
+        <h3>Welcome, {user.username}</h3>
+        <p>Role: {user.role}</p>
+        <button type="button" onClick={handleLogout}>Log out</button>
+      </main>
+    );
+  }
 
   return (
     <>
       <header />
       <nav />
       <main>
-        <h3>Register</h3>
-        <section id="role-selection-container">
+        <h3>{isLogin ? "Log in" : "Register"}</h3>
+        {!isLogin && <section id="role-selection-container">
           <label>Select Your Role:</label>
           <select id="role-selection" name="role" value ={formData.role} onChange={handleChange}>
               <option value="">Please select a role</option>
@@ -56,18 +109,18 @@ export default function RegistrationPage() {
               <option value="courier">Courier</option>
               <option value="restaurant">Restaurant Staff</option>
           </select>
-        </section>
+        </section>}
         <section id="registration-form-container">
-          <div id="input-field" name="email">
-            <label htmlFor="email">Email:</label>
-            <input type="email" placeholder="Email" name="email" value={formData.email} onChange={handleChange} />
+          <div id="input-field">
+            <label htmlFor="username">Username:</label>
+            <input type="text" placeholder="Username" name="username" value={formData.username} onChange={handleChange} required />
           </div>
-          <div id="input-field" placeholder = "Password" name="password" value={formData.password} onChange={handleChange}>
+          <div id="input-field">
             <label htmlFor="password">Password:</label>
-            <input type="password" placeholder="Password" />
+            <input type="password" placeholder="Password" name="password" value={formData.password} onChange={handleChange} required />
           </div>
 
-          {formData.role === "customer" && (
+          {!isLogin && formData.role === "customer" && (
             <>
               <div id="input-field" name="first_name">
                 <label htmlFor="first_name">First Name:</label>
@@ -87,7 +140,7 @@ export default function RegistrationPage() {
               </div>
             </>
             )}
-            {formData.role === "restaurant" && (
+            {!isLogin && formData.role === "restaurant" && (
             <>
               <div id="input-field" name="restaurant_name">
                 <label htmlFor="restaurant_name">Restaurant Name:</label>
@@ -95,15 +148,15 @@ export default function RegistrationPage() {
               </div>
               <div id="input-field" name="menu">
                 <label htmlFor="menu">Menu:</label>
-                <input type="file" accept=".pdf,.doc,.docx,.txt" name="menu" onChange={handleChange} />
+                <input type="file" accept=".pdf,.doc,.docx,.txt" name="menu" onChange={handleFileChange} />
               </div>
               <div id="input-field" name="logo">
                 <label htmlFor="logo">Logo:</label>
-                <input type="file" accept=".jpg,.jpeg,.png,.gif,.pdf" name="logo" onChange={handleChange} />
+                <input type="file" accept=".jpg,.jpeg,.png,.gif,.pdf" name="logo" onChange={handleFileChange} />
               </div>
             </>
           )}
-          {formData.role === "courier" && (
+          {!isLogin && formData.role === "courier" && (
             <>
               <div id="input-field" name="first_name">
                 <label htmlFor="first_name">First Name:</label>
@@ -115,7 +168,13 @@ export default function RegistrationPage() {
               </div>
             </>
           )}
-          <button type="submit" onClick={handleSubmit}>Register</button>
+          {error && <p role="alert">{error}</p>}
+          <button type="submit" onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? "Please wait..." : isLogin ? "Log in" : "Register"}
+          </button>
+          <button type="button" onClick={() => { setIsLogin(!isLogin); setError(""); }}>
+            {isLogin ? "Create an account" : "Use an existing account"}
+          </button>
         </section> 
       </main>
       <footer />
