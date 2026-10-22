@@ -1,4 +1,4 @@
-package com.midnightmunchies;
+package com.midnightmunchies.application;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
