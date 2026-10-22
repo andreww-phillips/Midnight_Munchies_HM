@@ -15,7 +15,7 @@ public final class Order {
 	private final UUID customerId;
 	private final UUID restaurantId;
 	private final List<OrderLine> orderLines;
-	private final OrderStatus status;
+	private OrderState state;
 	private final Instant createdAt;
 
 	public Order(UUID id, UUID customerId, UUID restaurantId, List<OrderLine> orderLines, Instant createdAt) {
@@ -28,7 +28,7 @@ public final class Order {
 		}
 		this.orderLines = List.copyOf(orderLines);
 		this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
-		this.status = OrderStatus.PLACED;
+		this.state = OrderStates.PLACED;
 	}
 
 	public UUID getId() {
@@ -47,12 +47,28 @@ public final class Order {
 		return orderLines;
 	}
 
-	/**
-	 * Read-only status view. Issue #9 can delegate this to an internal OrderState
-	 * and add validated domain operations without changing repository contracts.
-	 */
 	public OrderStatus getStatus() {
-		return status;
+		return state.status();
+	}
+
+	public void accept() {
+		state = state.accept();
+	}
+
+	public void reject() {
+		state = state.reject();
+	}
+
+	public void startPreparing() {
+		state = state.startPreparing();
+	}
+
+	public void markReady() {
+		state = state.markReady();
+	}
+
+	public void cancel() {
+		state = state.cancel();
 	}
 
 	public Instant getCreatedAt() {
