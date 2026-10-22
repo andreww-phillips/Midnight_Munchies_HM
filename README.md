@@ -16,3 +16,53 @@
 
 ## Product Overview:
 Midnight Munchies is a simulator for a late-night food ordering and delivery platform. It brings together customers, restaurants, couriers, and platform operators inside a single application, and it exposes the interfaces each of these roles needs to do their part in fulfilling an order. Customers browse menus, place and pay for orders, and follow the delivery on a map. Restaurant staff publish menus, accept or reject incoming orders, and mark food ready for pickup. Couriers go on duty, accept the order offered to them by the dispatcher, and confirm pickup and delivery. Operators supervise the running system, pause restaurants when needed, reassign stalled orders, and reset the simulation to its initial state for repeatable demonstrations. The sections that follow describe how the product fits into its environment and the assumptions on which its features rely.
+
+## Repository Structure
+
+```text
+Midnight_Munchies/
+├── frontend/
+│   ├── public/
+│   └── src/ui/dash/
+├── backend/
+│   └── src/
+│       ├── main/
+│       └── test/
+├── README.md
+├── .gitignore
+└── .gitattributes
+```
+
+## Running the Frontend
+
+Run these commands from `frontend/`:
+
+```bash
+npm ci
+npm run dev
+```
+
+Build and lint the frontend with:
+
+```bash
+npm run lint
+npm run build
+```
+
+## Running the Backend
+
+Run these commands from `backend/`:
+
+Windows:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+.\mvnw.cmd test
+```
+
+macOS/Linux:
+
+```bash
+./mvnw spring-boot:run
+./mvnw test
+```

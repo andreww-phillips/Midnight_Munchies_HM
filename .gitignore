@@ -23,9 +23,14 @@
 hs_err_pid*
 
 # Java and Node build output
-target/
-node_modules/
-dist/
-dist-ssr/
+**/node_modules/
+**/dist/
+**/target/
+
+.env
+.env.*
+!.env.example
+
+*.log
 *.local
 replay_pid*
