@@ -9,9 +9,9 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.midnightmunchies</groupId>
-	<artifactId>backend</artifactId>
+	<artifactId>midnight-munchies</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>backend</name>
+	<name>Midnight Munchies</name>
 	<description/>
 	<url/>
 	<licenses>

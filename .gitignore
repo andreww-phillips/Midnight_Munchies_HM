@@ -21,4 +21,16 @@
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+
+# Java and Node build output
+**/node_modules/
+**/dist/
+**/target/
+
+.env
+.env.*
+!.env.example
+
+*.log
+*.local
 replay_pid*

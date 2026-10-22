@@ -1,4 +1,4 @@
-package com.midnightmunchies;
+package com.midnightmunchies.application;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
