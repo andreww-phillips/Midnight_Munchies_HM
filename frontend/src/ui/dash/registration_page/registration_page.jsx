@@ -3,6 +3,7 @@ import { supabase } from "../../../supabaseClient";
 import RestaurantList from "../restaurant_library/restaurant_library.jsx";
 
 const API_URL = "http://localhost:8080/api/auth";
+const RESTAURANT_LOGO_BUCKET = "Restaurant Logos";
 
 export default function RegistrationPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -60,7 +61,6 @@ export default function RegistrationPage() {
     const base = {
       id: userId,
       username: formData.username,
-      password: formData.password,
     };
 
     switch (formData.role.toLowerCase()) {
@@ -69,24 +69,25 @@ export default function RegistrationPage() {
           ...base,
           first_name: formData.first_name,
           last_name: formData.last_name,
+          username: formData.username,
+          password: formData.password,
           delivery_longitude: parseFloat(formData.address_longitude || 0),
           delivery_latitude: parseFloat(formData.address_latitude || 0),
         };
       case "courier":
         return {
-          ...base,
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          work_id: formData.work_id,
+          id: userId,
+          username: formData.username,
+          password: formData.password,
+          work_id: Number(formData.work_id),
           status: formData.status || "available",
         };
       case "restaurant":
         return {
-          ...base,
+          id: userId,
           restaurant_name: formData.restaurant_name,
           restaurant_longitude: parseFloat(formData.address_longitude || 0),
           restaurant_latitude: parseFloat(formData.address_latitude || 0),
-          status: formData.status || "open",
         };
       default:
         return base;
@@ -96,6 +97,10 @@ export default function RegistrationPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    if (!isLogin && formData.role === "restaurant" && !formData.logo) {
+      setError("Please upload a restaurant logo.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const response = await fetch(`${API_URL}/${isLogin ? "login" : "register"}`, {
@@ -105,7 +110,11 @@ export default function RegistrationPage() {
         body: JSON.stringify({
           username: formData.username,
           password: formData.password,
-          role: formData.role ? formData.role.toUpperCase() : null,
+          role: formData.role
+            ? formData.role === "restaurant"
+              ? "RESTAURANT_STAFF"
+              : formData.role.toUpperCase()
+            : null,
         }),
       });
       if (!response.ok) {
@@ -123,7 +132,7 @@ export default function RegistrationPage() {
 
       // Handle Supabase Storage uploads for restaurant roles.
       let menuUrl = null;
-      let logoUrl = null;
+      let uploadedLogoPath = null;
 
       if (formData.role === "restaurant") {
         try {
@@ -142,30 +151,32 @@ export default function RegistrationPage() {
           }
 
           if (formData.logo) {
-            const logoPath = `${userId}/logo_${Date.now()}_${formData.logo.name}`;
+            const logoObjectPath = `${userId}/logo_${Date.now()}_${formData.logo.name}`;
             const { error: logoError } = await supabase.storage
-              .from("logos")
-              .upload(logoPath, formData.logo);
+              .from(RESTAURANT_LOGO_BUCKET)
+              .upload(logoObjectPath, formData.logo);
 
-            if (!logoError) {
-              const { data: logoPublic } = supabase.storage
-                .from("logos")
-                .getPublicUrl(logoPath);
-              logoUrl = logoPublic.publicUrl;
+            if (logoError) {
+              console.error("Restaurant logo upload error:", logoError.message);
+              setError(`Account created, but logo upload failed: ${logoError.message}`);
+              return;
             }
+
+            uploadedLogoPath = logoObjectPath;
           }
         } catch (uploadErr) {
           console.error("Storage upload error:", uploadErr);
         }
       }
 
-      const payload = {
-        ...buildPayload(userId),
-        ...(formData.role === "restaurant" && {
-          menu_url: menuUrl,
-          logo_url: logoUrl,
-        }),
-      };
+      const payload =
+        formData.role === "restaurant"
+          ? {
+              ...buildPayload(userId),
+              restaurant_logo: uploadedLogoPath,
+              menu: menuUrl,
+            }
+          : buildPayload(userId);
 
       const tableName =
         formData.role === "restaurant"
@@ -180,6 +191,8 @@ export default function RegistrationPage() {
 
       if (dbError) {
         console.error("Database insert error:", dbError.message);
+        setError(`Account created, but profile could not be saved: ${dbError.message}`);
+        return;
       }
 
       setUser(userData);
@@ -305,16 +318,17 @@ export default function RegistrationPage() {
             </>
           )}
           {!isLogin && formData.role === "courier" && (
-            <>
-              <div id="input-field" name="first_name">
-                <label htmlFor="first_name">First Name:</label>
-                <input type="text" placeholder="First Name" name="first_name" value={formData.first_name} onChange={handleChange} />
-              </div>
-              <div id="input-field" name="last_name">
-                <label htmlFor="last_name">Last Name:</label>
-                <input type="text" placeholder="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} />
-              </div>
-            </>
+            <div id="input-field" name="work_id">
+              <label htmlFor="work_id">Work ID:</label>
+              <input
+                type="number"
+                placeholder="Work ID"
+                name="work_id"
+                value={formData.work_id}
+                onChange={handleChange}
+                required
+              />
+            </div>
           )}
           {error && <p role="alert">{error}</p>}
           <button type="submit" onClick={handleSubmit} disabled={isSubmitting}>
