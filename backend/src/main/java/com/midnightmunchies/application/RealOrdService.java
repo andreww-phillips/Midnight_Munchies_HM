@@ -1,5 +1,6 @@
 package com.midnightmunchies.application;
 
+import com.midnightmunchies.domain.ord.Actor;
 import com.midnightmunchies.domain.ord.IllegalOrderTransitionException;
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
@@ -129,7 +130,7 @@ public class RealOrdService implements OrdService {
     @Override
     public Order startNextPreparation(UUID restaurantId, HttpSession session) {
         requireRestaurant(restaurantId);
-        return preparationQueue.startNext(restaurantId);
+        return preparationQueue.startNext(restaurantId, currentActor(session));
     }
 
     @Override
@@ -141,26 +142,34 @@ public class RealOrdService implements OrdService {
     @Override
     public Order markOrderReady(UUID restaurantId, UUID orderId, HttpSession session) {
         Order order = requireRestaurantOrder(restaurantId, orderId);
-        return preparationQueue.markReady(order);
+        return preparationQueue.markReady(order, currentActor(session));
     }
 
     @Override
     public Order cancelOrder(UUID orderId, HttpSession session) {
         Order order = requireOrder(orderId);
-        UserAccount user = currentUser(session);
-        if (user != null && user.role() == UserRole.CUSTOMER) {
-            if (!order.getCustomerId().equals(UUID.fromString(user.id()))) {
+        Actor actor = currentActor(session);
+        if (actor.role() == UserRole.CUSTOMER) {
+            if (!order.getCustomerId().equals(actor.userId())) {
                 throw new OrderNotFoundException("Order does not exist");
             }
             if (order.getStatus() != OrderStatus.PLACED) {
                 throw new IllegalOrderTransitionException(order.getStatus(), "cancel");
             }
         }
-        return preparationQueue.cancel(order);
+        return preparationQueue.cancel(order, actor);
     }
 
     private UserAccount currentUser(HttpSession session) {
         return (UserAccount) session.getAttribute(SESSION_USER);
+    }
+
+    private Actor currentActor(HttpSession session) {
+        UserAccount user = currentUser(session);
+        if (user == null) {
+            throw new AuthenticationRequiredException("Authentication is required");
+        }
+        return new Actor(UUID.fromString(user.id()), user.role());
     }
 
     private void requireRestaurant(UUID restaurantId) {

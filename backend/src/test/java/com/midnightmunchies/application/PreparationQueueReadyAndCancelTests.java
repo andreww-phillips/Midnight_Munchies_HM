@@ -1,9 +1,11 @@
 package com.midnightmunchies.application;
 
 import com.midnightmunchies.domain.ord.IllegalOrderTransitionException;
+import com.midnightmunchies.domain.ord.Actor;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderLine;
 import com.midnightmunchies.domain.ord.OrderStatus;
+import com.midnightmunchies.domain.reg.UserRole;
 import com.midnightmunchies.technicalservices.ord.repository.InMemoryOrderRepository;
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PreparationQueueReadyAndCancelTests {
 
+    private static final Actor ACTOR = new Actor(UUID.randomUUID(), UserRole.RESTAURANT_STAFF);
+
     private final InMemoryOrderRepository orders = new InMemoryOrderRepository();
     private final PreparationQueue queue = new PreparationQueue(orders);
     private final UUID restaurantId = UUID.randomUUID();
@@ -28,9 +32,9 @@ class PreparationQueueReadyAndCancelTests {
     @Test
     void markReadyMovesPreparingOrderToReady() {
         enqueue();
-        Order preparing = queue.startNext(restaurantId);
+        Order preparing = queue.startNext(restaurantId, ACTOR);
 
-        Order ready = queue.markReady(preparing);
+        Order ready = queue.markReady(preparing, ACTOR);
 
         assertEquals(OrderStatus.READY, ready.getStatus());
         assertEquals(OrderStatus.READY, orders.findById(preparing.getId()).orElseThrow().getStatus());
@@ -41,13 +45,13 @@ class PreparationQueueReadyAndCancelTests {
         Order placed = orders.save(order());
         Order accepted = enqueue();
         Order ready = enqueue();
-        queue.startNext(restaurantId);
-        queue.markReady(accepted);
-        queue.startNext(restaurantId);
-        queue.markReady(ready);
+        queue.startNext(restaurantId, ACTOR);
+        queue.markReady(accepted, ACTOR);
+        queue.startNext(restaurantId, ACTOR);
+        queue.markReady(ready, ACTOR);
 
-        assertThrows(IllegalOrderTransitionException.class, () -> queue.markReady(placed));
-        assertThrows(IllegalOrderTransitionException.class, () -> queue.markReady(ready));
+        assertThrows(IllegalOrderTransitionException.class, () -> queue.markReady(placed, ACTOR));
+        assertThrows(IllegalOrderTransitionException.class, () -> queue.markReady(ready, ACTOR));
         assertEquals(OrderStatus.PLACED, placed.getStatus());
         assertEquals(OrderStatus.READY, ready.getStatus());
     }
@@ -58,21 +62,21 @@ class PreparationQueueReadyAndCancelTests {
         Order b = enqueue();
         Order c = enqueue();
 
-        queue.cancel(a);
+        queue.cancel(a, ACTOR);
 
         assertEquals(OrderStatus.CANCELLED, a.getStatus());
         assertEquals(List.of(b, c), queue.view(restaurantId));
-        assertEquals(b.getId(), queue.startNext(restaurantId).getId());
-        assertEquals(c.getId(), queue.startNext(restaurantId).getId());
+        assertEquals(b.getId(), queue.startNext(restaurantId, ACTOR).getId());
+        assertEquals(c.getId(), queue.startNext(restaurantId, ACTOR).getId());
     }
 
     @Test
     void cancellingAPreparingOrderDoesNotChangeTheWaitingQueue() {
         Order a = enqueue();
         Order b = enqueue();
-        queue.startNext(restaurantId);
+        queue.startNext(restaurantId, ACTOR);
 
-        queue.cancel(a);
+        queue.cancel(a, ACTOR);
 
         assertEquals(OrderStatus.CANCELLED, a.getStatus());
         assertEquals(List.of(b), queue.view(restaurantId));
@@ -81,13 +85,13 @@ class PreparationQueueReadyAndCancelTests {
     @Test
     void readyAndTerminalOrdersCannotBeCancelled() {
         Order ready = enqueue();
-        queue.startNext(restaurantId);
-        queue.markReady(ready);
+        queue.startNext(restaurantId, ACTOR);
+        queue.markReady(ready, ACTOR);
         Order cancelled = orders.save(order());
-        queue.cancel(cancelled);
+        queue.cancel(cancelled, ACTOR);
 
-        assertThrows(IllegalOrderTransitionException.class, () -> queue.cancel(ready));
-        assertThrows(IllegalOrderTransitionException.class, () -> queue.cancel(cancelled));
+        assertThrows(IllegalOrderTransitionException.class, () -> queue.cancel(ready, ACTOR));
+        assertThrows(IllegalOrderTransitionException.class, () -> queue.cancel(cancelled, ACTOR));
         assertEquals(OrderStatus.READY, ready.getStatus());
     }
 
@@ -95,10 +99,10 @@ class PreparationQueueReadyAndCancelTests {
     void unsavedOrdersAreReportedAsNotFound() {
         Order unsaved = order();
 
-        assertThrows(OrderNotFoundException.class, () -> queue.cancel(unsaved));
-        assertThrows(OrderNotFoundException.class, () -> queue.markReady(unsaved));
-        assertThrows(NullPointerException.class, () -> queue.cancel(null));
-        assertThrows(NullPointerException.class, () -> queue.markReady(null));
+        assertThrows(OrderNotFoundException.class, () -> queue.cancel(unsaved, ACTOR));
+        assertThrows(OrderNotFoundException.class, () -> queue.markReady(unsaved, ACTOR));
+        assertThrows(NullPointerException.class, () -> queue.cancel(null, ACTOR));
+        assertThrows(NullPointerException.class, () -> queue.markReady(null, ACTOR));
     }
 
     @Test
@@ -110,11 +114,11 @@ class PreparationQueueReadyAndCancelTests {
             CountDownLatch go = new CountDownLatch(1);
             Future<?> cancel = pool.submit(() -> {
                 go.await();
-                return queue.cancel(first);
+                return queue.cancel(first, ACTOR);
             });
             Future<Order> start = pool.submit(() -> {
                 go.await();
-                return queue.startNext(restaurantId);
+                return queue.startNext(restaurantId, ACTOR);
             });
             go.countDown();
             Order started = start.get();
@@ -131,11 +135,11 @@ class PreparationQueueReadyAndCancelTests {
             Order storedSecond = orders.findById(second.getId()).orElseThrow();
             if (started.getId().equals(second.getId())) {
                 assertEquals(OrderStatus.PREPARING, storedSecond.getStatus());
-                queue.cancel(storedSecond);
+                queue.cancel(storedSecond, ACTOR);
             } else {
                 assertEquals(first.getId(), started.getId());
                 assertEquals(List.of(second), queue.view(restaurantId));
-                queue.cancel(storedSecond);
+                queue.cancel(storedSecond, ACTOR);
             }
             assertTrue(queue.view(restaurantId).isEmpty());
         }
