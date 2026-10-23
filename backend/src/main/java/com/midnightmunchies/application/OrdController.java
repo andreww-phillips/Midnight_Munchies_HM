@@ -1,5 +1,6 @@
 package com.midnightmunchies.application;
 
+import com.midnightmunchies.domain.ord.IllegalOrderTransitionException;
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
@@ -103,6 +104,35 @@ public class OrdController {
         return execute(() -> authorizedService.viewOrders(session));
     }
 
+    @PostMapping("/restaurants/{restaurantId}/preparation/next")
+    public ResponseEntity<?> startNextPreparation(@PathVariable UUID restaurantId, HttpSession session) {
+        return execute(() -> authorizedService.startNextPreparation(restaurantId, session));
+    }
+
+    @GetMapping("/restaurants/{restaurantId}/preparation")
+    public ResponseEntity<?> preparationQueue(@PathVariable UUID restaurantId, HttpSession session) {
+        return execute(() -> authorizedService.viewPreparationQueue(restaurantId, session));
+    }
+
+    @PostMapping("/restaurants/{restaurantId}/orders/{orderId}/ready")
+    public ResponseEntity<?> markOrderReady(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID orderId,
+            HttpSession session
+    ) {
+        return execute(() -> authorizedService.markOrderReady(restaurantId, orderId, session));
+    }
+
+    @PostMapping("/orders/{orderId}/cancel")
+    public ResponseEntity<?> cancelOrder(@PathVariable UUID orderId, HttpSession session) {
+        return execute(() -> authorizedService.cancelOrder(orderId, session));
+    }
+
+    @GetMapping("/orders/{orderId}/events")
+    public ResponseEntity<?> orderEvents(@PathVariable UUID orderId, HttpSession session) {
+        return execute(() -> authorizedService.viewOrderEvents(orderId, session));
+    }
+
     private <T> ResponseEntity<?> execute(AuthorizedOperation<T> operation) {
         return execute(operation, HttpStatus.OK);
     }
@@ -119,8 +149,11 @@ public class OrdController {
         } catch (AuthorizationException exception) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(new ErrorResponse(exception.getMessage()));
-        } catch (MenuItemNotFoundException exception) {
+        } catch (MenuItemNotFoundException | OrderNotFoundException exception) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse(exception.getMessage()));
+        } catch (EmptyPreparationQueueException | IllegalOrderTransitionException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(exception.getMessage()));
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest()
@@ -135,7 +168,7 @@ public class OrdController {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> invalidIdentifier() {
-        return ResponseEntity.badRequest().body(new ErrorResponse("Restaurant and menu item IDs must be valid UUIDs"));
+        return ResponseEntity.badRequest().body(new ErrorResponse("Restaurant, menu item and order IDs must be valid UUIDs"));
     }
 
     @FunctionalInterface

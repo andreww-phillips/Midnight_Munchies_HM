@@ -3,6 +3,7 @@ package com.midnightmunchies.application;
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
+import com.midnightmunchies.domain.ord.OrderEvent;
 import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
 import com.midnightmunchies.domain.reg.UserAccount;
@@ -101,6 +102,44 @@ public class AuthorizedOrdService implements OrdService {
         throw new AuthorizationException("This role cannot view orders");
     }
 
+    @Override
+    public Order startNextPreparation(UUID restaurantId, HttpSession session) {
+        requireQueueOwner(restaurantId, session);
+        return realService.startNextPreparation(restaurantId, session);
+    }
+
+    @Override
+    public List<Order> viewPreparationQueue(UUID restaurantId, HttpSession session) {
+        requireQueueOwner(restaurantId, session);
+        return realService.viewPreparationQueue(restaurantId, session);
+    }
+
+    @Override
+    public Order markOrderReady(UUID restaurantId, UUID orderId, HttpSession session) {
+        requireOwner(restaurantId, session,
+                "Only restaurant staff can mark orders ready",
+                "Staff can only mark their own restaurant's orders ready");
+        return realService.markOrderReady(restaurantId, orderId, session);
+    }
+
+    @Override
+    public Order cancelOrder(UUID orderId, HttpSession session) {
+        UserAccount user = requireAuthenticated(session);
+        if (user.role() != UserRole.CUSTOMER && user.role() != UserRole.PLATFORM_OPERATOR) {
+            throw new AuthorizationException("Only customers and operators can cancel orders");
+        }
+        return realService.cancelOrder(orderId, session);
+    }
+
+    @Override
+    public List<OrderEvent> viewOrderEvents(UUID orderId, HttpSession session) {
+        UserAccount user = requireAuthenticated(session);
+        if (user.role() == UserRole.COURIER) {
+            throw new AuthorizationException("Couriers cannot view order events");
+        }
+        return realService.viewOrderEvents(orderId, session);
+    }
+
     private UserAccount requireAuthenticated(HttpSession session) {
         UserAccount user = (UserAccount) session.getAttribute(SESSION_USER);
         if (user == null) {
@@ -118,13 +157,25 @@ public class AuthorizedOrdService implements OrdService {
     }
 
     private void requireRestaurantOwner(UUID restaurantId, HttpSession session) {
+        requireOwner(restaurantId, session,
+                "Only restaurant staff can manage menus",
+                "Staff can only manage their own restaurant's menu");
+    }
+
+    private void requireQueueOwner(UUID restaurantId, HttpSession session) {
+        requireOwner(restaurantId, session,
+                "Only restaurant staff can manage the preparation queue",
+                "Staff can only manage their own restaurant's preparation queue");
+    }
+
+    private void requireOwner(UUID restaurantId, HttpSession session, String notStaffMessage, String notOwnerMessage) {
         UserAccount user = requireAuthenticated(session);
         if (user.role() != UserRole.RESTAURANT_STAFF) {
-            throw new AuthorizationException("Only restaurant staff can manage menus");
+            throw new AuthorizationException(notStaffMessage);
         }
         Restaurant restaurant = requireRestaurant(restaurantId);
         if (!userId(user).equals(restaurant.getOwnerId())) {
-            throw new AuthorizationException("Staff can only manage their own restaurant's menu");
+            throw new AuthorizationException(notOwnerMessage);
         }
     }
 

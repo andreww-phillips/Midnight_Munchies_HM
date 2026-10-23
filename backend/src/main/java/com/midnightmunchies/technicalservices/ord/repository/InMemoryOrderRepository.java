@@ -1,9 +1,11 @@
 package com.midnightmunchies.technicalservices.ord.repository;
 
 import com.midnightmunchies.domain.ord.Order;
+import com.midnightmunchies.domain.ord.OrderStatus;
 import com.midnightmunchies.domain.ord.repository.OrderRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -46,6 +48,17 @@ public class InMemoryOrderRepository implements OrderRepository {
 		Objects.requireNonNull(customerId, "customerId must not be null");
 		return orders.values().stream()
 				.filter(order -> order.getCustomerId().equals(customerId))
+				.toList();
+	}
+
+	@Override
+	public List<Order> findPreparationQueue(UUID restaurantId) {
+		Objects.requireNonNull(restaurantId, "restaurantId must not be null");
+		return orders.values().stream()
+				.filter(order -> order.getRestaurantId().equals(restaurantId))
+				.filter(order -> order.getStatus() == OrderStatus.ACCEPTED)
+				.filter(order -> order.getAcceptedAt() != null)
+				.sorted(Comparator.comparing(Order::getAcceptedAt).thenComparing(Order::getId))
 				.toList();
 	}
 }
