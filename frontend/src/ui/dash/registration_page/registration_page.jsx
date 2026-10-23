@@ -58,6 +58,7 @@ export default function RegistrationPage() {
     const base = {
       id: userId,
       username: formData.username,
+      password: formData.password,
     };
 
     switch (formData.role.toLowerCase()) {
@@ -192,6 +193,20 @@ export default function RegistrationPage() {
     await fetch(`${API_URL}/logout`, { method: "POST", credentials: "include" });
     setUser(null);
     setError("");
+    setFormData({
+      role: "",
+      username: "",
+      password: "",
+      first_name: "",
+      last_name: "",
+      restaurant_name: "",
+      work_id: "",
+      address_longitude: "",
+      address_latitude: "",
+      status: "",
+      menu: null,
+      logo: null,
+    });
   };
 
   if (user) {
