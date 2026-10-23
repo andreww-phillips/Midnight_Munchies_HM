@@ -113,6 +113,23 @@ public class AuthorizedOrdService implements OrdService {
         return realService.viewPreparationQueue(restaurantId, session);
     }
 
+    @Override
+    public Order markOrderReady(UUID restaurantId, UUID orderId, HttpSession session) {
+        requireOwner(restaurantId, session,
+                "Only restaurant staff can mark orders ready",
+                "Staff can only mark their own restaurant's orders ready");
+        return realService.markOrderReady(restaurantId, orderId, session);
+    }
+
+    @Override
+    public Order cancelOrder(UUID orderId, HttpSession session) {
+        UserAccount user = requireAuthenticated(session);
+        if (user.role() != UserRole.CUSTOMER && user.role() != UserRole.PLATFORM_OPERATOR) {
+            throw new AuthorizationException("Only customers and operators can cancel orders");
+        }
+        return realService.cancelOrder(orderId, session);
+    }
+
     private UserAccount requireAuthenticated(HttpSession session) {
         UserAccount user = (UserAccount) session.getAttribute(SESSION_USER);
         if (user == null) {

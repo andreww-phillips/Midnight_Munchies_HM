@@ -56,9 +56,32 @@ public class PreparationQueue {
         }
     }
 
+    public Order markReady(Order order) {
+        Objects.requireNonNull(order, "order must not be null");
+        synchronized (lockFor(order.getRestaurantId())) {
+            Order current = reload(order);
+            current.markReady();
+            return orderRepository.save(current);
+        }
+    }
+
+    public Order cancel(Order order) {
+        Objects.requireNonNull(order, "order must not be null");
+        synchronized (lockFor(order.getRestaurantId())) {
+            Order current = reload(order);
+            current.cancel();
+            return orderRepository.save(current);
+        }
+    }
+
     public List<Order> view(UUID restaurantId) {
         Objects.requireNonNull(restaurantId, "restaurantId must not be null");
         return orderRepository.findPreparationQueue(restaurantId);
+    }
+
+    private Order reload(Order order) {
+        return orderRepository.findById(order.getId())
+                .orElseThrow(() -> new OrderNotFoundException("Order does not exist"));
     }
 
     private Object lockFor(UUID restaurantId) {
