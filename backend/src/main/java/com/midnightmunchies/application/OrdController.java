@@ -1,5 +1,6 @@
 package com.midnightmunchies.application;
 
+import com.midnightmunchies.domain.ord.IllegalOrderTransitionException;
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
@@ -128,7 +129,7 @@ public class OrdController {
         } catch (MenuItemNotFoundException exception) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new ErrorResponse(exception.getMessage()));
-        } catch (EmptyPreparationQueueException exception) {
+        } catch (EmptyPreparationQueueException | IllegalOrderTransitionException exception) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(exception.getMessage()));
         } catch (IllegalArgumentException exception) {
