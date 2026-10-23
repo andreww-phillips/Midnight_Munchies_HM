@@ -7,13 +7,19 @@ import java.util.UUID;
 public final class Restaurant {
 
 	private final UUID id;
+	private final UUID ownerId;
 	private final String name;
 	private final RestaurantStatus status;
 	private final double latitude;
 	private final double longitude;
 
 	public Restaurant(UUID id, String name, RestaurantStatus status, double latitude, double longitude) {
+		this(id, null, name, status, latitude, longitude);
+	}
+
+	public Restaurant(UUID id, UUID ownerId, String name, RestaurantStatus status, double latitude, double longitude) {
 		this.id = Objects.requireNonNull(id, "id must not be null");
+		this.ownerId = ownerId;
 		this.name = OrdValidation.requireName(name);
 		this.status = Objects.requireNonNull(status, "status must not be null");
 		if (!Double.isFinite(latitude) || latitude < -90 || latitude > 90) {
@@ -28,6 +34,10 @@ public final class Restaurant {
 
 	public UUID getId() {
 		return id;
+	}
+
+	public UUID getOwnerId() {
+		return ownerId;
 	}
 
 	public String getName() {
