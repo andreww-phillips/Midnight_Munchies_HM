@@ -97,8 +97,8 @@ export default function RegistrationPage() {
 
   return (
     <>
-      <header />
-      <nav />
+      <header></header>
+      <nav></nav>
       <main>
         <h3>{isLogin ? "Log in" : "Register"}</h3>
         {!isLogin && <section id="role-selection-container">
