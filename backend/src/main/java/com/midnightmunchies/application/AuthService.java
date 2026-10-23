@@ -17,7 +17,9 @@ public class AuthService {
 
     public AuthService() {
         seed("customer@example.com", "password", UserRole.CUSTOMER);
-        seed("restaurant@example.com", "password", UserRole.RESTAURANT_STAFF);
+        // Matches Bobs Burgers' owner in DemoCatalog; authorization still checks the stored ownerId.
+        seed(UUID.fromString("30000000-0000-0000-0000-000000000001"),
+                "restaurant@example.com", "password", UserRole.RESTAURANT_STAFF);
         seed("courier@example.com", "password", UserRole.COURIER);
         seed("operator@example.com", "password", UserRole.PLATFORM_OPERATOR);
     }
@@ -48,7 +50,11 @@ public class AuthService {
     }
 
     private void seed(String username, String password, UserRole role) {
-        users.put(username, new UserAccount(UUID.randomUUID().toString(), username, hash(password), role));
+        seed(UUID.randomUUID(), username, password, role);
+    }
+
+    private void seed(UUID id, String username, String password, UserRole role) {
+        users.put(username, new UserAccount(id.toString(), username, hash(password), role));
     }
 
     private boolean matches(String password, String passwordHash) {

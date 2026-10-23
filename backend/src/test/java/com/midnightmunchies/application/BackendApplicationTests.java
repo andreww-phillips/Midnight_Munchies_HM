@@ -9,6 +9,8 @@ import com.midnightmunchies.domain.ord.RestaurantStatus;
 import com.midnightmunchies.domain.ord.repository.MenuItemRepository;
 import com.midnightmunchies.domain.ord.repository.OrderRepository;
 import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
+import com.midnightmunchies.domain.reg.UserAccount;
+import com.midnightmunchies.domain.reg.UserRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,8 +34,21 @@ class BackendApplicationTests {
 	@Autowired
 	private OrderRepository orders;
 
+	@Autowired
+	private AuthService authService;
+
 	@Test
 	void contextLoads() {
+	}
+
+	@Test
+	void demoStaffIdentityIsAssociatedWithOnlyItsAssignedRestaurant() {
+		UserAccount staff = authService.authenticate("restaurant@example.com", "password");
+		assertEquals(UserRole.RESTAURANT_STAFF, staff.role());
+		assertEquals(List.of("Bobs Burgers"), restaurants.findAll().stream()
+				.filter(restaurant -> UUID.fromString(staff.id()).equals(restaurant.getOwnerId()))
+				.map(Restaurant::getName)
+				.toList());
 	}
 
 	@Test
