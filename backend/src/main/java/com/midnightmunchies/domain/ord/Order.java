@@ -19,6 +19,7 @@ public final class Order {
 	private OrderState state;
 	private final Instant createdAt;
 	private Instant acceptedAt;
+	private String rejectionReason;
 	private final List<OrderTransition> pendingTransitions = new ArrayList<>();
 
 	public Order(UUID id, UUID customerId, UUID restaurantId, List<OrderLine> orderLines, Instant createdAt) {
@@ -73,8 +74,13 @@ public final class Order {
 		transitionTo(state.accept());
 	}
 
-	public void reject() {
+	/** Rejects the order and records why; the order is terminal afterwards. */
+	public void reject(String reason) {
+		if (reason == null || reason.isBlank()) {
+			throw new IllegalArgumentException("A rejection reason is required");
+		}
 		transitionTo(state.reject());
+		rejectionReason = reason.strip();
 	}
 
 	public void startPreparing() {
@@ -107,6 +113,10 @@ public final class Order {
 
 	public Instant getCreatedAt() {
 		return createdAt;
+	}
+
+	public String getRejectionReason() {
+		return rejectionReason;
 	}
 
 	public Instant getAcceptedAt() {

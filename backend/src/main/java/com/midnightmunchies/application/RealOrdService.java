@@ -147,6 +147,18 @@ public class RealOrdService implements OrdService {
     }
 
     @Override
+    public Order acceptOrder(UUID restaurantId, UUID orderId, HttpSession session) {
+        Order order = requireRestaurantOrder(restaurantId, orderId);
+        return preparationQueue.accept(order, currentActor(session));
+    }
+
+    @Override
+    public Order rejectOrder(UUID restaurantId, UUID orderId, String reason, HttpSession session) {
+        Order order = requireRestaurantOrder(restaurantId, orderId);
+        return preparationQueue.reject(order, reason, currentActor(session));
+    }
+
+    @Override
     public Order startNextPreparation(UUID restaurantId, HttpSession session) {
         requireRestaurant(restaurantId);
         return preparationQueue.startNext(restaurantId, currentActor(session));

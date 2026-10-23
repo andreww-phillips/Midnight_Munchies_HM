@@ -54,6 +54,26 @@ public class PreparationQueue {
         }
     }
 
+    public Order accept(Order order, Actor actor) {
+        Objects.requireNonNull(order, "order must not be null");
+        Objects.requireNonNull(actor, "actor must not be null");
+        synchronized (lockFor(order.getRestaurantId())) {
+            Order current = reload(order);
+            current.accept();
+            return transitions.save(current, actor);
+        }
+    }
+
+    public Order reject(Order order, String reason, Actor actor) {
+        Objects.requireNonNull(order, "order must not be null");
+        Objects.requireNonNull(actor, "actor must not be null");
+        synchronized (lockFor(order.getRestaurantId())) {
+            Order current = reload(order);
+            current.reject(reason);
+            return transitions.save(current, actor);
+        }
+    }
+
     public Order startNext(UUID restaurantId, Actor actor) {
         Objects.requireNonNull(restaurantId, "restaurantId must not be null");
         Objects.requireNonNull(actor, "actor must not be null");

@@ -28,6 +28,10 @@ public interface OrdService {
 
     List<Order> viewOrders(HttpSession session);
 
+    Order acceptOrder(UUID restaurantId, UUID orderId, HttpSession session);
+
+    Order rejectOrder(UUID restaurantId, UUID orderId, String reason, HttpSession session);
+
     Order startNextPreparation(UUID restaurantId, HttpSession session);
 
     List<Order> viewPreparationQueue(UUID restaurantId, HttpSession session);

@@ -103,6 +103,18 @@ public class AuthorizedOrdService implements OrdService {
     }
 
     @Override
+    public Order acceptOrder(UUID restaurantId, UUID orderId, HttpSession session) {
+        requireOrderOwner(restaurantId, session);
+        return realService.acceptOrder(restaurantId, orderId, session);
+    }
+
+    @Override
+    public Order rejectOrder(UUID restaurantId, UUID orderId, String reason, HttpSession session) {
+        requireOrderOwner(restaurantId, session);
+        return realService.rejectOrder(restaurantId, orderId, reason, session);
+    }
+
+    @Override
     public Order startNextPreparation(UUID restaurantId, HttpSession session) {
         requireQueueOwner(restaurantId, session);
         return realService.startNextPreparation(restaurantId, session);
@@ -160,6 +172,12 @@ public class AuthorizedOrdService implements OrdService {
         requireOwner(restaurantId, session,
                 "Only restaurant staff can manage menus",
                 "Staff can only manage their own restaurant's menu");
+    }
+
+    private void requireOrderOwner(UUID restaurantId, HttpSession session) {
+        requireOwner(restaurantId, session,
+                "Only restaurant staff can accept or reject orders",
+                "Staff can only accept or reject their own restaurant's orders");
     }
 
     private void requireQueueOwner(UUID restaurantId, HttpSession session) {
