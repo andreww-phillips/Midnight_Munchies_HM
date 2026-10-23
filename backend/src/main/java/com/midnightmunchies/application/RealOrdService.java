@@ -11,6 +11,7 @@ import com.midnightmunchies.domain.ord.repository.OrderRepository;
 import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
 import com.midnightmunchies.domain.reg.UserAccount;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -25,15 +26,27 @@ public class RealOrdService implements OrdService {
     private final RestaurantRepository restaurantRepository;
     private final MenuItemRepository menuItemRepository;
     private final OrderRepository orderRepository;
+    private final PreparationQueue preparationQueue;
 
     public RealOrdService(
             RestaurantRepository restaurantRepository,
             MenuItemRepository menuItemRepository,
             OrderRepository orderRepository
     ) {
+        this(restaurantRepository, menuItemRepository, orderRepository, new PreparationQueue(orderRepository));
+    }
+
+    @Autowired
+    public RealOrdService(
+            RestaurantRepository restaurantRepository,
+            MenuItemRepository menuItemRepository,
+            OrderRepository orderRepository,
+            PreparationQueue preparationQueue
+    ) {
         this.restaurantRepository = restaurantRepository;
         this.menuItemRepository = menuItemRepository;
         this.orderRepository = orderRepository;
+        this.preparationQueue = preparationQueue;
     }
 
     @Override
@@ -108,6 +121,18 @@ public class RealOrdService implements OrdService {
     @Override
     public List<Order> viewOrders(HttpSession session) {
         return orderRepository.findAll();
+    }
+
+    @Override
+    public Order startNextPreparation(UUID restaurantId, HttpSession session) {
+        requireRestaurant(restaurantId);
+        return preparationQueue.startNext(restaurantId);
+    }
+
+    @Override
+    public List<Order> viewPreparationQueue(UUID restaurantId, HttpSession session) {
+        requireRestaurant(restaurantId);
+        return preparationQueue.view(restaurantId);
     }
 
     private UserAccount currentUser(HttpSession session) {

@@ -101,6 +101,18 @@ public class AuthorizedOrdService implements OrdService {
         throw new AuthorizationException("This role cannot view orders");
     }
 
+    @Override
+    public Order startNextPreparation(UUID restaurantId, HttpSession session) {
+        requireQueueOwner(restaurantId, session);
+        return realService.startNextPreparation(restaurantId, session);
+    }
+
+    @Override
+    public List<Order> viewPreparationQueue(UUID restaurantId, HttpSession session) {
+        requireQueueOwner(restaurantId, session);
+        return realService.viewPreparationQueue(restaurantId, session);
+    }
+
     private UserAccount requireAuthenticated(HttpSession session) {
         UserAccount user = (UserAccount) session.getAttribute(SESSION_USER);
         if (user == null) {
@@ -118,13 +130,25 @@ public class AuthorizedOrdService implements OrdService {
     }
 
     private void requireRestaurantOwner(UUID restaurantId, HttpSession session) {
+        requireOwner(restaurantId, session,
+                "Only restaurant staff can manage menus",
+                "Staff can only manage their own restaurant's menu");
+    }
+
+    private void requireQueueOwner(UUID restaurantId, HttpSession session) {
+        requireOwner(restaurantId, session,
+                "Only restaurant staff can manage the preparation queue",
+                "Staff can only manage their own restaurant's preparation queue");
+    }
+
+    private void requireOwner(UUID restaurantId, HttpSession session, String notStaffMessage, String notOwnerMessage) {
         UserAccount user = requireAuthenticated(session);
         if (user.role() != UserRole.RESTAURANT_STAFF) {
-            throw new AuthorizationException("Only restaurant staff can manage menus");
+            throw new AuthorizationException(notStaffMessage);
         }
         Restaurant restaurant = requireRestaurant(restaurantId);
         if (!userId(user).equals(restaurant.getOwnerId())) {
-            throw new AuthorizationException("Staff can only manage their own restaurant's menu");
+            throw new AuthorizationException(notOwnerMessage);
         }
     }
 

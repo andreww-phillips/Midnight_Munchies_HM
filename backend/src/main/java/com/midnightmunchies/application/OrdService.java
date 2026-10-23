@@ -27,6 +27,10 @@ public interface OrdService {
 
     List<Order> viewOrders(HttpSession session);
 
+    Order startNextPreparation(UUID restaurantId, HttpSession session);
+
+    List<Order> viewPreparationQueue(UUID restaurantId, HttpSession session);
+
     record OrderLineRequest(UUID menuItemId, int quantity) {
     }
 }
