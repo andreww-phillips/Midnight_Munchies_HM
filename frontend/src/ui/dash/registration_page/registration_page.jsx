@@ -218,27 +218,7 @@ export default function RegistrationPage() {
         <h3>Welcome, {user.username}</h3>
         <p>Role: {user.role}</p>
         <button type="button" onClick={handleLogout}>Log out</button>
-        {!showRestaurantLibrary && (
-          <button
-            type="button"
-            onClick={() => setShowRestaurantLibrary(true)}
-          >
-            Restaurant Library
-          </button>
-        )}
-        {showRestaurantLibrary ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setShowRestaurantLibrary(false)}
-            >
-              Back
-            </button>
-            <RestaurantList role={user.role} />
-          </>
-        ) : (
-          <RestaurantList role={user.role} />
-        )}
+        <RestaurantList role={user.role} />
       </div>
     );
   }

@@ -63,6 +63,7 @@ export default function RestaurantList({ role }) {
       {selectedRestaurant ? (
         <RestaurantMenu
           restaurant={selectedRestaurant}
+          role={role}
           onBack={() => setSelectedRestaurant(null)}
         />
       ) : (
