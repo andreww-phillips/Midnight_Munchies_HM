@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { supabase } from "../../../supabaseClient";
 
 const API_URL = "http://localhost:8080/api/auth";
 
@@ -52,6 +53,43 @@ export default function RegistrationPage() {
     }));
   };
 
+  // Build role-specific payload for registration
+  const buildPayload = (userId) => {
+    const base = {
+      id: userId,
+      username: formData.username,
+    };
+
+    switch (formData.role.toLowerCase()) {
+      case "customer":
+        return {
+          ...base,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          delivery_longitude: parseFloat(formData.address_longitude || 0),
+          delivery_latitude: parseFloat(formData.address_latitude || 0),
+        };
+      case "courier":
+        return {
+          ...base,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          work_id: formData.work_id,
+          status: formData.status || "available",
+        };
+      case "restaurant":
+        return {
+          ...base,
+          restaurant_name: formData.restaurant_name,
+          restaurant_longitude: parseFloat(formData.address_longitude || 0),
+          restaurant_latitude: parseFloat(formData.address_latitude || 0),
+          status: formData.status || "open",
+        };
+      default:
+        return base;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -64,15 +102,86 @@ export default function RegistrationPage() {
         body: JSON.stringify({
           username: formData.username,
           password: formData.password,
-          role: formData.role ? formData.role.toUpperCase() : null
-        })
+          role: formData.role ? formData.role.toUpperCase() : null,
+        }),
       });
       if (!response.ok) {
         setError(isLogin ? "Invalid username or password." : "Registration could not be completed.");
         return;
       }
-      setUser(await response.json());
-    } catch {
+      const userData = await response.json();
+
+      if (isLogin) {
+        setUser(userData);
+        return;
+      }
+
+      const userId = userData.id || userData.username;
+
+      // Handle Supabase Storage uploads for restaurant roles.
+      let menuUrl = null;
+      let logoUrl = null;
+
+      if (formData.role === "restaurant") {
+        try {
+          if (formData.menu) {
+            const menuPath = `${userId}/menu_${Date.now()}_${formData.menu.name}`;
+            const { error: menuError } = await supabase.storage
+              .from("menus")
+              .upload(menuPath, formData.menu);
+
+            if (!menuError) {
+              const { data: menuPublic } = supabase.storage
+                .from("menus")
+                .getPublicUrl(menuPath);
+              menuUrl = menuPublic.publicUrl;
+            }
+          }
+
+          if (formData.logo) {
+            const logoPath = `${userId}/logo_${Date.now()}_${formData.logo.name}`;
+            const { error: logoError } = await supabase.storage
+              .from("logos")
+              .upload(logoPath, formData.logo);
+
+            if (!logoError) {
+              const { data: logoPublic } = supabase.storage
+                .from("logos")
+                .getPublicUrl(logoPath);
+              logoUrl = logoPublic.publicUrl;
+            }
+          }
+        } catch (uploadErr) {
+          console.error("Storage upload error:", uploadErr);
+        }
+      }
+
+      const payload = {
+        ...buildPayload(userId),
+        ...(formData.role === "restaurant" && {
+          menu_url: menuUrl,
+          logo_url: logoUrl,
+        }),
+      };
+
+      const tableName =
+        formData.role === "restaurant"
+          ? "Restaurant"
+          : formData.role === "courier"
+            ? "Courrier_Info"
+            : "Customer_Info";
+
+      const { error: dbError } = await supabase
+        .from(tableName)
+        .insert([payload]);
+
+      if (dbError) {
+        console.error("Database insert error:", dbError.message);
+      }
+
+      setUser(userData);
+    } catch (err) {
+      console.error(err);
       setError("Unable to connect to the authentication service.");
     } finally {
       setIsSubmitting(false);
