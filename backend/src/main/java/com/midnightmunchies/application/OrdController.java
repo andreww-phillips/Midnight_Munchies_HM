@@ -102,6 +102,16 @@ public class OrdController {
         return execute(() -> authorizedService.viewOrders(session));
     }
 
+    @PostMapping("/restaurants/{restaurantId}/preparation/next")
+    public ResponseEntity<?> startNextPreparation(@PathVariable UUID restaurantId, HttpSession session) {
+        return execute(() -> authorizedService.startNextPreparation(restaurantId, session));
+    }
+
+    @GetMapping("/restaurants/{restaurantId}/preparation")
+    public ResponseEntity<?> preparationQueue(@PathVariable UUID restaurantId, HttpSession session) {
+        return execute(() -> authorizedService.viewPreparationQueue(restaurantId, session));
+    }
+
     private <T> ResponseEntity<?> execute(AuthorizedOperation<T> operation) {
         return execute(operation, HttpStatus.OK);
     }
@@ -117,6 +127,9 @@ public class OrdController {
                     .body(new ErrorResponse(exception.getMessage()));
         } catch (MenuItemNotFoundException exception) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse(exception.getMessage()));
+        } catch (EmptyPreparationQueueException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(exception.getMessage()));
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest()
