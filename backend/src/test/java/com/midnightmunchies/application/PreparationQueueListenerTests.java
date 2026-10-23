@@ -42,7 +42,7 @@ class PreparationQueueListenerTests {
     @Test
     void otherTransitionsDoNotTouchTheQueue() {
         Order rejected = order();
-        rejected.reject();
+        rejected.reject("Out of stock");
         transitions.save(rejected, STAFF);
         Order cancelled = order();
         cancelled.cancel();

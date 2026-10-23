@@ -27,7 +27,7 @@ class OrderTransitionRecordingTests {
 	@Test
 	void rejectAndCancelAreRecorded() {
 		Order rejected = order();
-		rejected.reject();
+		rejected.reject("Out of stock");
 		Order cancelled = order();
 		cancelled.cancel();
 

@@ -140,7 +140,7 @@ class PreparationQueueTests {
         assertThrows(IllegalArgumentException.class, () -> queue.enqueueAccepted(placed));
 
         Order rejected = order(restaurantId, NOW);
-        rejected.reject();
+        rejected.reject("Out of stock");
         assertThrows(IllegalArgumentException.class, () -> queue.enqueueAccepted(rejected));
 
         assertThrows(NullPointerException.class, () -> queue.enqueueAccepted(null));

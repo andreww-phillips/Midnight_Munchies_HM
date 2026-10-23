@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class OrderStateTests {
 
 	private static final List<Consumer<Order>> ALL_TRANSITIONS = List.of(
-			Order::accept, Order::reject, Order::startPreparing, Order::markReady, Order::cancel);
+			Order::accept, order -> order.reject("reason"), Order::startPreparing, Order::markReady, Order::cancel);
 
 	@Test
 	void happyPathMovesPlacedAcceptedPreparingReady() {
@@ -30,7 +30,7 @@ class OrderStateTests {
 	@Test
 	void placedOrderCanBeRejectedOrCancelled() {
 		Order rejected = order();
-		rejected.reject();
+		rejected.reject("Out of stock");
 		assertEquals(OrderStatus.REJECTED, rejected.getStatus());
 
 		Order cancelled = order();
@@ -63,14 +63,14 @@ class OrderStateTests {
 		accepted.accept();
 		assertThrows(IllegalOrderTransitionException.class, accepted::markReady);
 		assertThrows(IllegalOrderTransitionException.class, accepted::accept);
-		assertThrows(IllegalOrderTransitionException.class, accepted::reject);
+		assertThrows(IllegalOrderTransitionException.class, () -> accepted.reject("Too late"));
 		assertEquals(OrderStatus.ACCEPTED, accepted.getStatus());
 	}
 
 	@Test
 	void rejectedAndCancelledOrdersCannotBeAdvanced() {
 		Order rejected = order();
-		rejected.reject();
+		rejected.reject("Out of stock");
 		Order cancelled = order();
 		cancelled.cancel();
 		for (Consumer<Order> transition : ALL_TRANSITIONS) {
@@ -91,6 +91,31 @@ class OrderStateTests {
 			assertThrows(IllegalOrderTransitionException.class, () -> transition.accept(ready));
 		}
 		assertEquals(OrderStatus.READY, ready.getStatus());
+	}
+
+	@Test
+	void rejectionRecordsTheReasonAndRequiresOne() {
+		Order order = order();
+		assertNull(order.getRejectionReason());
+		assertThrows(IllegalArgumentException.class, () -> order.reject(null));
+		assertThrows(IllegalArgumentException.class, () -> order.reject("  "));
+		assertEquals(OrderStatus.PLACED, order.getStatus());
+
+		order.reject("  Kitchen closed ");
+
+		assertEquals(OrderStatus.REJECTED, order.getStatus());
+		assertEquals("Kitchen closed", order.getRejectionReason());
+	}
+
+	@Test
+	void failedRejectionDoesNotRecordAReason() {
+		Order order = order();
+		order.accept();
+
+		assertThrows(IllegalOrderTransitionException.class, () -> order.reject("Too late"));
+
+		assertNull(order.getRejectionReason());
+		assertEquals(OrderStatus.ACCEPTED, order.getStatus());
 	}
 
 	private Order order() {
