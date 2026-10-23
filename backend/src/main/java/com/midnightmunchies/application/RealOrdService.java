@@ -145,6 +145,23 @@ public class RealOrdService implements OrdService {
         }
     }
 
+    private Order requireOrder(UUID orderId) {
+        if (orderId == null) {
+            throw new IllegalArgumentException("Order ID is required");
+        }
+        return orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order does not exist"));
+    }
+
+    private Order requireRestaurantOrder(UUID restaurantId, UUID orderId) {
+        requireRestaurant(restaurantId);
+        Order order = requireOrder(orderId);
+        if (!order.getRestaurantId().equals(restaurantId)) {
+            throw new OrderNotFoundException("Order does not exist for this restaurant");
+        }
+        return order;
+    }
+
     private MenuItem requireMenuItem(UUID restaurantId, UUID menuItemId) {
         requireRestaurant(restaurantId);
         if (menuItemId == null) {
