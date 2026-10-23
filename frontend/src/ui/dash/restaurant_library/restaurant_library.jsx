@@ -6,7 +6,7 @@ import OrderHistory from '../order_history.jsx';
 import RestaurantDashboard from '../restaurant_dashboard/restaurant_dashboard.jsx';
 import './restaurant_library.css';
 
-export default function RestaurantList({ user }) {
+export default function RestaurantList({ user, onSessionExpired }) {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,6 +35,7 @@ export default function RestaurantList({ user }) {
           <RestaurantDashboard
             restaurant={selectedRestaurant}
             user={user}
+            onSessionExpired={onSessionExpired}
             onBack={() => setSelectedRestaurant(null)}
           />
         ) : selectedRestaurant ? (

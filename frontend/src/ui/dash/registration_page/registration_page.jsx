@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import RestaurantList from "../restaurant_library/restaurant_library.jsx";
 import { api } from "../../../api";
 
@@ -128,6 +128,13 @@ export default function RegistrationPage() {
     });
   };
 
+  const handleSessionExpired = useCallback((message) => {
+    setUser(null);
+    setIsLogin(true);
+    setError(message);
+    setFormData((previous) => ({ ...previous, password: "" }));
+  }, []);
+
   if (user) {
     return (
       <div className="app-shell">
@@ -140,7 +147,7 @@ export default function RegistrationPage() {
           <button className="secondary-button" type="button" onClick={handleLogout}>Log out</button>
         </header>
         {error && <p role="alert">{error}</p>}
-        <RestaurantList user={user} />
+        <RestaurantList user={user} onSessionExpired={handleSessionExpired} />
       </div>
     );
   }

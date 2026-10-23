@@ -15,6 +15,10 @@
 .dashboard-order-heading h4 { overflow-wrap: anywhere; min-width: 0; }
 .dashboard-order-heading .status-pill { flex-shrink: 0; }
 .restaurant-dashboard .order-card p { overflow-wrap: anywhere; }
+.dashboard-order-actions { display: grid; justify-items: start; gap: 12px; }
+.dashboard-order-actions form { width: 100%; margin: 0; gap: 12px; justify-items: start; }
+.dashboard-order-actions label { width: 100%; overflow-wrap: anywhere; }
+.dashboard-success { margin-top: 16px; padding: 12px; border-radius: 10px; background: var(--accent-bg); color: var(--text-h); overflow-wrap: anywhere; }
 
 @media (max-width: 600px) {
   .restaurant-dashboard { padding: 18px; }

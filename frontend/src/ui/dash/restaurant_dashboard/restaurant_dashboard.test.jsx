@@ -7,7 +7,8 @@ import RestaurantDashboard from './restaurant_dashboard';
 import RegistrationPage from '../registration_page/registration_page';
 
 vi.mock('../../../api', () => ({ api: {
-  currentUser: vi.fn(), restaurants: vi.fn(), orders: vi.fn(), preparationQueue: vi.fn(), menu: vi.fn()
+  currentUser: vi.fn(), restaurants: vi.fn(), orders: vi.fn(), preparationQueue: vi.fn(), menu: vi.fn(),
+  acceptOrder: vi.fn(), rejectOrder: vi.fn(), startNextPreparation: vi.fn(), markOrderReady: vi.fn()
 } }));
 
 const restaurant = { id: 'restaurant-1', ownerId: 'staff-1', name: 'Bobs Burgers' };
@@ -69,7 +70,10 @@ describe('restaurant order viewing', () => {
     expect(container.textContent).not.toContain('foreign');
     expect(api.orders).toHaveBeenCalledTimes(1);
     expect(api.preparationQueue).toHaveBeenCalledWith(restaurant.id);
-    expect([...container.querySelectorAll('button')].map((element) => element.textContent)).toEqual(['Refresh orders']);
+    expect(button('Accept')).toBeDefined();
+    expect(button('Reject')).toBeDefined();
+    expect(button('Mark Ready')).toBeDefined();
+    expect(button('Start next preparation').disabled).toBe(true);
   });
 
   it('preserves server FIFO order rather than placement time, IDs, or the orders response order', async () => {
@@ -155,6 +159,13 @@ describe('restaurant order viewing', () => {
       expect(container.querySelector('[role="alert"]').textContent).toContain('Only owning restaurant staff');
       expect(api.orders).not.toHaveBeenCalled();
       expect(api.preparationQueue).not.toHaveBeenCalled();
+      expect(button('Accept')).toBeUndefined();
+      expect(button('Reject')).toBeUndefined();
+      expect(button('Start next preparation')).toBeUndefined();
+      expect(button('Mark Ready')).toBeUndefined();
+      for (const method of ['acceptOrder', 'rejectOrder', 'startNextPreparation', 'markOrderReady']) {
+        expect(api[method]).not.toHaveBeenCalled();
+      }
     }
   );
 
@@ -167,7 +178,258 @@ describe('restaurant order viewing', () => {
   });
 });
 
+async function enterReason(value) {
+  await act(async () => {
+    const input = group('Incoming orders').querySelector('input');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+async function submitRejection() {
+  await act(async () => group('Incoming orders').querySelector('form')
+    .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+}
+
+describe('restaurant lifecycle commands', () => {
+  it('accepts an order, immediately displays its returned state, and refreshes both lists', async () => {
+    const accepted = order('incoming', 'ACCEPTED');
+    const refresh = deferred();
+    api.orders.mockResolvedValueOnce([order('incoming')]).mockReturnValueOnce(refresh.promise);
+    api.preparationQueue.mockResolvedValueOnce([]).mockResolvedValueOnce([accepted]);
+    api.acceptOrder.mockResolvedValue(accepted);
+    await renderDashboard();
+    await click(button('Accept'));
+
+    expect(api.acceptOrder).toHaveBeenCalledExactlyOnceWith(restaurant.id, 'incoming');
+    expect(group('Last updated order').textContent).toContain('ACCEPTED');
+    expect(container.querySelector('.dashboard-success').textContent).toBe('Order #incoming is now ACCEPTED.');
+    expect(button('Refresh orders').disabled).toBe(true);
+    expect(api.orders).toHaveBeenCalledTimes(2);
+    expect(api.preparationQueue).toHaveBeenCalledTimes(2);
+
+    await act(async () => refresh.resolve([accepted]));
+    expect(ids('Preparation queue')).toEqual(['Order #incoming']);
+    expect(group('Incoming orders').querySelector('article')).toBeNull();
+    expect(container.querySelector('h2').textContent).toBe('Bobs Burgers orders');
+    expect(button('Refresh orders').disabled).toBe(false);
+  });
+
+  it('rejects with a trimmed reason and displays the backend rejection details', async () => {
+    const rejected = order('incoming', 'REJECTED', { rejectionReason: 'Out of burgers' });
+    api.orders.mockResolvedValueOnce([order('incoming')]).mockResolvedValueOnce([rejected]);
+    api.rejectOrder.mockResolvedValue(rejected);
+    await renderDashboard();
+    await enterReason('  Out of burgers  ');
+    await submitRejection();
+
+    expect(api.rejectOrder).toHaveBeenCalledExactlyOnceWith(restaurant.id, 'incoming', 'Out of burgers');
+    expect(group('Other orders').textContent).toContain('REJECTED');
+    expect(group('Other orders').textContent).toContain('Rejection reason: Out of burgers');
+    expect(button('Reject')).toBeUndefined();
+    expect(api.orders).toHaveBeenCalledTimes(2);
+    expect(api.preparationQueue).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['', '   \t  '])('rejects blank reasons locally (%j)', async (reason) => {
+    api.orders.mockResolvedValue([order('incoming')]);
+    await renderDashboard();
+    await enterReason(reason);
+    await submitRejection();
+    expect(container.querySelector('[role="alert"]').textContent).toBe('A rejection reason is required.');
+    expect(api.rejectOrder).not.toHaveBeenCalled();
+    expect(container.querySelector('.dashboard-success')).toBeNull();
+    expect(button('Accept').disabled).toBe(false);
+  });
+
+  it('starts the backend-selected next order even when another order is preparing', async () => {
+    const first = order('first', 'ACCEPTED'), second = order('second', 'ACCEPTED');
+    const preparing = order('first', 'PREPARING');
+    api.orders.mockResolvedValueOnce([first, second, order('already-cooking', 'PREPARING')])
+      .mockResolvedValueOnce([preparing, second, order('already-cooking', 'PREPARING')]);
+    api.preparationQueue.mockResolvedValueOnce([first, second]).mockResolvedValueOnce([second]);
+    api.startNextPreparation.mockResolvedValue(preparing);
+    await renderDashboard();
+    expect(button('Start next preparation').disabled).toBe(false);
+    expect(group('Preparation queue').querySelectorAll('button')).toHaveLength(1);
+    await click(button('Start next preparation'));
+
+    expect(api.startNextPreparation).toHaveBeenCalledExactlyOnceWith(restaurant.id);
+    expect(ids('Preparation queue')).toEqual(['Order #second']);
+    expect(ids('Preparing')).toEqual(['Order #first', 'Order #already-cooking']);
+    expect(button('Start next preparation').disabled).toBe(false);
+    expect(api.orders).toHaveBeenCalledTimes(2);
+    expect(api.preparationQueue).toHaveBeenCalledTimes(2);
+  });
+
+  it('marks a preparing order ready and removes its ready control', async () => {
+    const ready = order('cooking', 'READY');
+    api.orders.mockResolvedValueOnce([order('cooking', 'PREPARING')]).mockResolvedValueOnce([ready]);
+    api.markOrderReady.mockResolvedValue(ready);
+    await renderDashboard();
+    await click(button('Mark Ready'));
+
+    expect(api.markOrderReady).toHaveBeenCalledExactlyOnceWith(restaurant.id, 'cooking');
+    expect(ids('Ready')).toEqual(['Order #cooking']);
+    expect(button('Mark Ready')).toBeUndefined();
+    expect(container.querySelector('.dashboard-success').textContent).toContain('READY');
+    expect(api.orders).toHaveBeenCalledTimes(2);
+    expect(api.preparationQueue).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['PLACED', ['Accept', 'Reject']], ['ACCEPTED', []], ['PREPARING', ['Mark Ready']],
+    ['READY', []], ['REJECTED', []], ['CANCELLED', []]
+  ])('only offers the relevant per-order controls for %s', async (status, controls) => {
+    const current = order('current', status);
+    api.orders.mockResolvedValue([current]);
+    api.preparationQueue.mockResolvedValue(status === 'ACCEPTED' ? [current] : []);
+    await renderDashboard();
+    expect([...container.querySelector('article').querySelectorAll('button')].map((element) => element.textContent)).toEqual(controls);
+  });
+
+  it.each([
+    ['Accept', 'acceptOrder', 'ACCEPTED'], ['Reject', 'rejectOrder', 'REJECTED'],
+    ['Start next preparation', 'startNextPreparation', 'PREPARING'], ['Mark Ready', 'markOrderReady', 'READY']
+  ])('blocks repeated %s submissions until the command and refresh finish', async (label, method, status) => {
+    const command = deferred(), refresh = deferred();
+    const waiting = order('waiting', 'ACCEPTED');
+    api.orders.mockResolvedValueOnce([order('incoming'), order('cooking', 'PREPARING'), waiting])
+      .mockReturnValueOnce(refresh.promise);
+    api.preparationQueue.mockResolvedValue([waiting]);
+    api[method].mockReturnValue(command.promise);
+    await renderDashboard();
+    if (label === 'Reject') await enterReason('Kitchen closed');
+    const actionButton = button(label);
+    const rejectionForm = group('Incoming orders').querySelector('form');
+    await act(async () => {
+      if (label === 'Reject') {
+        rejectionForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        rejectionForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      } else { actionButton.click(); actionButton.click(); }
+    });
+
+    expect(api[method]).toHaveBeenCalledTimes(1);
+    for (const control of container.querySelectorAll('button, input')) expect(control.disabled).toBe(true);
+    expect(container.querySelector('[aria-busy]').getAttribute('aria-busy')).toBe('true');
+    expect([...container.querySelectorAll('[role="status"]')].some((element) => element.textContent.endsWith('...'))).toBe(true);
+    const updated = order(method === 'startNextPreparation' ? 'waiting' : method === 'markOrderReady' ? 'cooking' : 'incoming', status);
+    await act(async () => command.resolve(updated));
+    expect(button('Refresh orders').disabled).toBe(true);
+    expect(api[method]).toHaveBeenCalledTimes(1);
+    await act(async () => refresh.resolve([updated]));
+    expect(button('Refresh orders').disabled).toBe(false);
+    expect(container.querySelector('[aria-busy]').getAttribute('aria-busy')).toBe('false');
+    expect(api[method]).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([400, 403, 404, 409])('shows HTTP %s errors without success and releases the pending guard', async (status) => {
+    api.orders.mockResolvedValue([order('incoming')]);
+    api.acceptOrder.mockRejectedValue(Object.assign(new Error('Backend refused the order command'), { status }));
+    await renderDashboard();
+    await click(button('Accept'));
+    expect(container.querySelector('[role="alert"]').textContent).toBe('Backend refused the order command');
+    expect(container.querySelector('.dashboard-success')).toBeNull();
+    expect(group('Last updated order')).toBeNull();
+    expect(button('Accept').disabled).toBe(false);
+    expect(api.acceptOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the rejection draft when the backend refuses the reason', async () => {
+    api.orders.mockResolvedValue([order('incoming')]);
+    api.rejectOrder.mockRejectedValue(Object.assign(new Error('Invalid rejection reason'), { status: 400 }));
+    await renderDashboard();
+    await enterReason('Kitchen closed');
+    await submitRejection();
+    expect(group('Incoming orders').querySelector('input').value).toBe('Kitchen closed');
+    expect(container.querySelector('[role="alert"]').textContent).toBe('Invalid rejection reason');
+    expect(container.querySelector('.dashboard-success')).toBeNull();
+  });
+
+  it('resynchronizes after another session changes an incoming order', async () => {
+    api.orders.mockResolvedValueOnce([order('incoming')]).mockResolvedValueOnce([
+      order('incoming', 'REJECTED', { rejectionReason: 'Rejected by another session' })
+    ]);
+    api.acceptOrder.mockRejectedValue(Object.assign(new Error('Cannot accept an order that is REJECTED'), { status: 409 }));
+    await renderDashboard();
+    await click(button('Accept'));
+    expect(container.querySelector('[role="alert"]').textContent).toContain('Cannot accept');
+    expect(container.querySelector('.dashboard-success')).toBeNull();
+    expect(button('Accept')).toBeUndefined();
+    expect(group('Other orders').textContent).toContain('Rejected by another session');
+    expect(api.acceptOrder).toHaveBeenCalledTimes(1);
+    expect(api.orders).toHaveBeenCalledTimes(2);
+  });
+
+  it('handles an emptied queue conflict without claiming success or retrying the command', async () => {
+    const waiting = order('waiting', 'ACCEPTED');
+    api.orders.mockResolvedValueOnce([waiting]).mockResolvedValueOnce([order('waiting', 'PREPARING')]);
+    api.preparationQueue.mockResolvedValueOnce([waiting]).mockResolvedValueOnce([]);
+    api.startNextPreparation.mockRejectedValue(Object.assign(new Error('No accepted orders are waiting to be prepared'), { status: 409 }));
+    await renderDashboard();
+    await click(button('Start next preparation'));
+    expect(container.querySelector('[role="alert"]').textContent).toContain('No accepted orders');
+    expect(container.querySelector('.dashboard-success')).toBeNull();
+    expect(button('Start next preparation').disabled).toBe(true);
+    expect(ids('Preparing')).toEqual(['Order #waiting']);
+    expect(api.startNextPreparation).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['orders', 'preparationQueue'])('keeps the successful result when the %s refresh fails and recovers through read-only refresh', async (method) => {
+    const accepted = order('incoming', 'ACCEPTED');
+    api.orders.mockResolvedValue([order('incoming')]);
+    api.acceptOrder.mockResolvedValue(accepted);
+    await renderDashboard();
+    api[method].mockRejectedValueOnce(new Error('Refresh unavailable'));
+    await click(button('Accept'));
+    expect(container.querySelector('.dashboard-success').textContent).toContain('ACCEPTED');
+    expect(container.querySelector('[role="alert"]').textContent).toContain('operation succeeded, but the dashboard could not refresh');
+    expect(group('Last updated order').textContent).toContain('ACCEPTED');
+    expect(group('Incoming orders')).toBeNull();
+    expect(button('Accept')).toBeUndefined();
+    expect(api.acceptOrder).toHaveBeenCalledTimes(1);
+    api.orders.mockResolvedValue([accepted]);
+    api.preparationQueue.mockResolvedValue([accepted]);
+    await click(button('Refresh orders'));
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(ids('Preparation queue')).toEqual(['Order #incoming']);
+    expect(button('Start next preparation').disabled).toBe(false);
+    expect(api.acceptOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the returned rejection reason even if the follow-up refresh fails', async () => {
+    api.orders.mockResolvedValue([order('incoming')]);
+    api.rejectOrder.mockResolvedValue(order('incoming', 'REJECTED', { rejectionReason: 'Kitchen closed' }));
+    await renderDashboard();
+    api.orders.mockRejectedValueOnce(new Error('Network unavailable'));
+    await enterReason('Kitchen closed');
+    await submitRejection();
+    expect(group('Last updated order').textContent).toContain('Rejection reason: Kitchen closed');
+    expect(container.querySelector('.dashboard-success').textContent).toContain('REJECTED');
+  });
+});
+
 describe('asynchronous safety', () => {
+  it.each(['success', 'expired session'])('ignores a late command result (%s) after changing restaurants', async (outcome) => {
+    const command = deferred();
+    const onSessionExpired = vi.fn();
+    api.orders.mockResolvedValueOnce([order('old-order')]).mockResolvedValueOnce([]);
+    api.acceptOrder.mockReturnValue(command.promise);
+    await act(async () => root.render(<RestaurantDashboard restaurant={restaurant} user={staff} onSessionExpired={onSessionExpired} />));
+    await click(button('Accept'));
+    await renderDashboard({ ...otherRestaurant, ownerId: staff.id });
+    await act(async () => {
+      if (outcome === 'success') command.resolve(order('old-order', 'ACCEPTED'));
+      else command.reject(Object.assign(new Error('Old session expired'), { status: 401 }));
+    });
+    expect(container.querySelector('h2').textContent).toBe('Other Diner orders');
+    expect(container.textContent).not.toContain('old-order');
+    expect(container.querySelector('.dashboard-success')).toBeNull();
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(onSessionExpired).not.toHaveBeenCalled();
+    expect(api.orders).toHaveBeenCalledTimes(2);
+  });
+
   it('ignores late data from the previous restaurant', async () => {
     const oldOrders = deferred(), oldQueue = deferred();
     const selected = { ...otherRestaurant, ownerId: staff.id };
@@ -225,6 +487,39 @@ describe('asynchronous safety', () => {
 
 describe('application navigation', () => {
   beforeEach(() => api.restaurants.mockResolvedValue([restaurant, otherRestaurant, { id: 'unowned', name: 'Unowned Diner' }]));
+
+  it.each(['initial load', 'manual refresh', 'command', 'refresh after success'])(
+    'returns to login for an expired session during %s', async (phase) => {
+      api.currentUser.mockResolvedValue(staff);
+      api.orders.mockResolvedValue([order('incoming')]);
+      await act(async () => root.render(<RegistrationPage />));
+      const expired = Object.assign(new Error('Authentication is required'), { status: 401 });
+      if (phase === 'initial load') api.preparationQueue.mockRejectedValueOnce(expired);
+      await click(button('Manage orders'));
+      if (phase === 'manual refresh') {
+        api.preparationQueue.mockRejectedValueOnce(expired);
+        await click(button('Refresh orders'));
+      } else if (phase === 'command') {
+        api.acceptOrder.mockRejectedValueOnce(expired);
+        await click(button('Accept'));
+      } else if (phase === 'refresh after success') {
+        api.acceptOrder.mockResolvedValueOnce(order('incoming', 'ACCEPTED'));
+        api.preparationQueue.mockRejectedValueOnce(expired);
+        await click(button('Accept'));
+      }
+      expect(container.querySelector('.auth-card form')).not.toBeNull();
+      expect(container.querySelector('h1').textContent).toBe('Welcome back');
+      expect(container.querySelector('[role="alert"]').textContent).toContain('Your session expired. Please log in again.');
+      expect(container.querySelector('input[type="password"]').value).toBe('');
+      expect(container.querySelector('.restaurant-dashboard')).toBeNull();
+      expect(container.querySelector('.dashboard-success')).toBeNull();
+      if (phase === 'refresh after success') {
+        expect(container.querySelector('[role="alert"]').textContent).toContain('Order #incoming is now ACCEPTED.');
+        expect(container.querySelector('[role="alert"]').textContent).toContain('operation succeeded, but the dashboard could not refresh');
+      } else expect(container.querySelector('[role="alert"]').textContent).not.toContain('is now');
+      expect(api.acceptOrder).toHaveBeenCalledTimes(phase === 'command' || phase === 'refresh after success' ? 1 : 0);
+    }
+  );
 
   it.each(['CUSTOMER', 'COURIER', 'PLATFORM_OPERATOR'])('hides Manage orders from %s', async (role) => {
     api.currentUser.mockResolvedValue({ ...staff, role });
