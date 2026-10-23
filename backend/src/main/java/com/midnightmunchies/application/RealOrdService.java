@@ -126,9 +126,9 @@ public class RealOrdService implements OrdService {
             throw new IllegalArgumentException("Menu item ID is required");
         }
         MenuItem item = menuItemRepository.findById(menuItemId)
-                .orElseThrow(() -> new IllegalArgumentException("Menu item does not exist"));
+                .orElseThrow(() -> new MenuItemNotFoundException("Menu item does not exist for this restaurant"));
         if (!item.getRestaurantId().equals(restaurantId)) {
-            throw new IllegalArgumentException("Menu item does not belong to this restaurant");
+            throw new MenuItemNotFoundException("Menu item does not exist for this restaurant");
         }
         return item;
     }
