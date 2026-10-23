@@ -3,6 +3,7 @@ package com.midnightmunchies.application;
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
+import com.midnightmunchies.domain.ord.OrderEvent;
 import com.midnightmunchies.domain.ord.Restaurant;
 import jakarta.servlet.http.HttpSession;
 
@@ -34,6 +35,8 @@ public interface OrdService {
     Order markOrderReady(UUID restaurantId, UUID orderId, HttpSession session);
 
     Order cancelOrder(UUID orderId, HttpSession session);
+
+    List<OrderEvent> viewOrderEvents(UUID orderId, HttpSession session);
 
     record OrderLineRequest(UUID menuItemId, int quantity) {
     }

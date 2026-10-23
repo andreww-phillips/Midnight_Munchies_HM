@@ -1,5 +1,6 @@
 package com.midnightmunchies.application;
 
+import com.midnightmunchies.domain.ord.Actor;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderLine;
 import com.midnightmunchies.domain.ord.OrderStatus;
@@ -49,8 +50,9 @@ class MarkReadyAndCancelControllerTests {
     private OrderRepository orders;
 
     @Autowired
-    private PreparationQueue queue;
+    private OrderTransitions transitions;
 
+    private Actor staff;
     private UUID restaurantId;
     private UUID customerId;
     private MockHttpSession ownerSession;
@@ -67,6 +69,7 @@ class MarkReadyAndCancelControllerTests {
         operatorSession = login(operator);
         customerId = UUID.fromString(customer.id());
         restaurantId = UUID.randomUUID();
+        staff = new Actor(UUID.fromString(owner.id()), UserRole.RESTAURANT_STAFF);
         restaurants.save(new Restaurant(restaurantId, UUID.fromString(owner.id()), "Diner", RestaurantStatus.OPEN, 0, 0));
     }
 
@@ -169,13 +172,14 @@ class MarkReadyAndCancelControllerTests {
     private Order accepted(UUID customer) {
         Order order = placed(customer);
         order.accept();
-        return queue.enqueueAccepted(order);
+        transitions.save(order, staff);
+        return orders.findById(order.getId()).orElseThrow();
     }
 
     private Order preparing() {
         Order order = accepted(UUID.randomUUID());
         order.startPreparing();
-        return orders.save(order);
+        return transitions.save(order, staff);
     }
 
     private UserAccount register(UserRole role) {

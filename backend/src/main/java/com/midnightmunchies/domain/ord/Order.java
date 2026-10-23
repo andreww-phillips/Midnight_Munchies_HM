@@ -1,6 +1,7 @@
 package com.midnightmunchies.domain.ord;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -18,6 +19,7 @@ public final class Order {
 	private OrderState state;
 	private final Instant createdAt;
 	private Instant acceptedAt;
+	private final List<OrderTransition> pendingTransitions = new ArrayList<>();
 
 	public Order(UUID id, UUID customerId, UUID restaurantId, List<OrderLine> orderLines, Instant createdAt) {
 		this(id, customerId, restaurantId, orderLines, createdAt, OrderStates.PLACED, null);
@@ -68,23 +70,39 @@ public final class Order {
 	}
 
 	public void accept() {
-		state = state.accept();
+		transitionTo(state.accept());
 	}
 
 	public void reject() {
-		state = state.reject();
+		transitionTo(state.reject());
 	}
 
 	public void startPreparing() {
-		state = state.startPreparing();
+		transitionTo(state.startPreparing());
 	}
 
 	public void markReady() {
-		state = state.markReady();
+		transitionTo(state.markReady());
 	}
 
 	public void cancel() {
-		state = state.cancel();
+		transitionTo(state.cancel());
+	}
+
+	public List<OrderTransition> pullTransitions() {
+		List<OrderTransition> pulled = List.copyOf(pendingTransitions);
+		pendingTransitions.clear();
+		return pulled;
+	}
+
+	public boolean hasPendingTransitions() {
+		return !pendingTransitions.isEmpty();
+	}
+
+	private void transitionTo(OrderState next) {
+		OrderStatus from = state.status();
+		state = next;
+		pendingTransitions.add(new OrderTransition(from, next.status()));
 	}
 
 	public Instant getCreatedAt() {

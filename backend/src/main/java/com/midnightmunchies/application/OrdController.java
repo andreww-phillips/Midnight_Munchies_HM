@@ -127,6 +127,11 @@ public class OrdController {
         return execute(() -> authorizedService.cancelOrder(orderId, session));
     }
 
+    @GetMapping("/orders/{orderId}/events")
+    public ResponseEntity<?> orderEvents(@PathVariable UUID orderId, HttpSession session) {
+        return execute(() -> authorizedService.viewOrderEvents(orderId, session));
+    }
+
     private <T> ResponseEntity<?> execute(AuthorizedOperation<T> operation) {
         return execute(operation, HttpStatus.OK);
     }

@@ -1,5 +1,6 @@
 package com.midnightmunchies.application;
 
+import com.midnightmunchies.domain.ord.Actor;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderStatus;
 import com.midnightmunchies.domain.ord.repository.OrderRepository;
@@ -19,16 +20,26 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PreparationQueue {
 
     private final OrderRepository orderRepository;
+    private final OrderTransitions transitions;
     private final Clock clock;
     private final Map<UUID, Object> locks = new ConcurrentHashMap<>();
 
-    @Autowired
     public PreparationQueue(OrderRepository orderRepository) {
         this(orderRepository, Clock.systemUTC());
     }
 
     public PreparationQueue(OrderRepository orderRepository, Clock clock) {
+        this(orderRepository, new OrderTransitions(orderRepository, new OrderEventPublisher(), clock), clock);
+    }
+
+    @Autowired
+    public PreparationQueue(OrderRepository orderRepository, OrderTransitions transitions) {
+        this(orderRepository, transitions, Clock.systemUTC());
+    }
+
+    public PreparationQueue(OrderRepository orderRepository, OrderTransitions transitions, Clock clock) {
         this.orderRepository = Objects.requireNonNull(orderRepository, "orderRepository must not be null");
+        this.transitions = Objects.requireNonNull(transitions, "transitions must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 
@@ -43,8 +54,9 @@ public class PreparationQueue {
         }
     }
 
-    public Order startNext(UUID restaurantId) {
+    public Order startNext(UUID restaurantId, Actor actor) {
         Objects.requireNonNull(restaurantId, "restaurantId must not be null");
+        Objects.requireNonNull(actor, "actor must not be null");
         synchronized (lockFor(restaurantId)) {
             List<Order> queue = orderRepository.findPreparationQueue(restaurantId);
             if (queue.isEmpty()) {
@@ -52,25 +64,27 @@ public class PreparationQueue {
             }
             Order next = queue.get(0);
             next.startPreparing();
-            return orderRepository.save(next);
+            return transitions.save(next, actor);
         }
     }
 
-    public Order markReady(Order order) {
+    public Order markReady(Order order, Actor actor) {
         Objects.requireNonNull(order, "order must not be null");
+        Objects.requireNonNull(actor, "actor must not be null");
         synchronized (lockFor(order.getRestaurantId())) {
             Order current = reload(order);
             current.markReady();
-            return orderRepository.save(current);
+            return transitions.save(current, actor);
         }
     }
 
-    public Order cancel(Order order) {
+    public Order cancel(Order order, Actor actor) {
         Objects.requireNonNull(order, "order must not be null");
+        Objects.requireNonNull(actor, "actor must not be null");
         synchronized (lockFor(order.getRestaurantId())) {
             Order current = reload(order);
             current.cancel();
-            return orderRepository.save(current);
+            return transitions.save(current, actor);
         }
     }
 

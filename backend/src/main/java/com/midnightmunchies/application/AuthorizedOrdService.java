@@ -3,6 +3,7 @@ package com.midnightmunchies.application;
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
+import com.midnightmunchies.domain.ord.OrderEvent;
 import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
 import com.midnightmunchies.domain.reg.UserAccount;
@@ -128,6 +129,15 @@ public class AuthorizedOrdService implements OrdService {
             throw new AuthorizationException("Only customers and operators can cancel orders");
         }
         return realService.cancelOrder(orderId, session);
+    }
+
+    @Override
+    public List<OrderEvent> viewOrderEvents(UUID orderId, HttpSession session) {
+        UserAccount user = requireAuthenticated(session);
+        if (user.role() == UserRole.COURIER) {
+            throw new AuthorizationException("Couriers cannot view order events");
+        }
+        return realService.viewOrderEvents(orderId, session);
     }
 
     private UserAccount requireAuthenticated(HttpSession session) {

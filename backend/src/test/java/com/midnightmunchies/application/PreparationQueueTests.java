@@ -1,8 +1,10 @@
 package com.midnightmunchies.application;
 
+import com.midnightmunchies.domain.ord.Actor;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderLine;
 import com.midnightmunchies.domain.ord.OrderStatus;
+import com.midnightmunchies.domain.reg.UserRole;
 import com.midnightmunchies.technicalservices.ord.repository.InMemoryOrderRepository;
 import org.junit.jupiter.api.Test;
 
@@ -26,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PreparationQueueTests {
 
+    private static final Actor ACTOR = new Actor(UUID.randomUUID(), UserRole.RESTAURANT_STAFF);
+
     private static final Instant NOW = Instant.parse("2026-10-23T20:00:00.123456789Z");
 
     private final InMemoryOrderRepository orders = new InMemoryOrderRepository();
@@ -38,9 +42,9 @@ class PreparationQueueTests {
         Order b = enqueue(restaurantId);
         Order c = enqueue(restaurantId);
 
-        assertEquals(a.getId(), queue.startNext(restaurantId).getId());
-        assertEquals(b.getId(), queue.startNext(restaurantId).getId());
-        assertEquals(c.getId(), queue.startNext(restaurantId).getId());
+        assertEquals(a.getId(), queue.startNext(restaurantId, ACTOR).getId());
+        assertEquals(b.getId(), queue.startNext(restaurantId, ACTOR).getId());
+        assertEquals(c.getId(), queue.startNext(restaurantId, ACTOR).getId());
         assertEquals(OrderStatus.PREPARING, a.getStatus());
         assertEquals(OrderStatus.PREPARING, b.getStatus());
         assertEquals(OrderStatus.PREPARING, c.getStatus());
@@ -53,8 +57,8 @@ class PreparationQueueTests {
         queue.enqueueAccepted(placedSecond);
         queue.enqueueAccepted(placedFirst);
 
-        assertEquals(placedSecond.getId(), queue.startNext(restaurantId).getId());
-        assertEquals(placedFirst.getId(), queue.startNext(restaurantId).getId());
+        assertEquals(placedSecond.getId(), queue.startNext(restaurantId, ACTOR).getId());
+        assertEquals(placedFirst.getId(), queue.startNext(restaurantId, ACTOR).getId());
     }
 
     @Test
@@ -78,8 +82,8 @@ class PreparationQueueTests {
         b.cancel();
         orders.save(b);
 
-        assertEquals(a.getId(), queue.startNext(restaurantId).getId());
-        assertEquals(c.getId(), queue.startNext(restaurantId).getId());
+        assertEquals(a.getId(), queue.startNext(restaurantId, ACTOR).getId());
+        assertEquals(c.getId(), queue.startNext(restaurantId, ACTOR).getId());
         assertEquals(OrderStatus.CANCELLED, b.getStatus());
     }
 
@@ -88,7 +92,7 @@ class PreparationQueueTests {
         Order earlier = enqueue(restaurantId);
         Order later = enqueue(restaurantId);
 
-        Order started = queue.startNext(restaurantId);
+        Order started = queue.startNext(restaurantId, ACTOR);
 
         assertEquals(earlier.getId(), started.getId());
         assertEquals(OrderStatus.ACCEPTED, later.getStatus());
@@ -103,7 +107,7 @@ class PreparationQueueTests {
 
         assertEquals(List.of(mine), queue.view(restaurantId));
         assertEquals(List.of(theirs), queue.view(otherRestaurantId));
-        assertEquals(theirs.getId(), queue.startNext(otherRestaurantId).getId());
+        assertEquals(theirs.getId(), queue.startNext(otherRestaurantId, ACTOR).getId());
         assertEquals(List.of(mine), queue.view(restaurantId));
     }
 
@@ -116,18 +120,18 @@ class PreparationQueueTests {
 
         assertEquals(enqueued, queue.view(restaurantId));
         for (Order expected : enqueued) {
-            assertEquals(expected.getId(), queue.startNext(restaurantId).getId());
+            assertEquals(expected.getId(), queue.startNext(restaurantId, ACTOR).getId());
         }
         assertTrue(queue.view(restaurantId).isEmpty());
     }
 
     @Test
     void emptyQueueThrows() {
-        assertThrows(EmptyPreparationQueueException.class, () -> queue.startNext(restaurantId));
+        assertThrows(EmptyPreparationQueueException.class, () -> queue.startNext(restaurantId, ACTOR));
 
         enqueue(restaurantId);
-        queue.startNext(restaurantId);
-        assertThrows(EmptyPreparationQueueException.class, () -> queue.startNext(restaurantId));
+        queue.startNext(restaurantId, ACTOR);
+        assertThrows(EmptyPreparationQueueException.class, () -> queue.startNext(restaurantId, ACTOR));
     }
 
     @Test
@@ -166,7 +170,7 @@ class PreparationQueueTests {
         for (int i = 0; i < count; i++) {
             tasks.add(() -> {
                 go.await();
-                return liveQueue.startNext(restaurantId).getId();
+                return liveQueue.startNext(restaurantId, ACTOR).getId();
             });
         }
         List<Future<UUID>> futures = new ArrayList<>();
