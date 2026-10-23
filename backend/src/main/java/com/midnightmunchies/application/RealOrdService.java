@@ -135,6 +135,12 @@ public class RealOrdService implements OrdService {
         return preparationQueue.view(restaurantId);
     }
 
+    @Override
+    public Order markOrderReady(UUID restaurantId, UUID orderId, HttpSession session) {
+        Order order = requireRestaurantOrder(restaurantId, orderId);
+        return preparationQueue.markReady(order);
+    }
+
     private UserAccount currentUser(HttpSession session) {
         return (UserAccount) session.getAttribute(SESSION_USER);
     }

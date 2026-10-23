@@ -113,6 +113,14 @@ public class AuthorizedOrdService implements OrdService {
         return realService.viewPreparationQueue(restaurantId, session);
     }
 
+    @Override
+    public Order markOrderReady(UUID restaurantId, UUID orderId, HttpSession session) {
+        requireOwner(restaurantId, session,
+                "Only restaurant staff can mark orders ready",
+                "Staff can only mark their own restaurant's orders ready");
+        return realService.markOrderReady(restaurantId, orderId, session);
+    }
+
     private UserAccount requireAuthenticated(HttpSession session) {
         UserAccount user = (UserAccount) session.getAttribute(SESSION_USER);
         if (user == null) {
