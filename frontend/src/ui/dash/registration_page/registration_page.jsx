@@ -3,10 +3,12 @@ import { supabase } from "../../../supabaseClient";
 import RestaurantList from "../restaurant_library/restaurant_library.jsx";
 
 const API_URL = "http://localhost:8080/api/auth";
+const RESTAURANT_LOGO_BUCKET = "Restaurant Logos";
 
 export default function RegistrationPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [user, setUser] = useState(null);
+  const [showRestaurantLibrary, setShowRestaurantLibrary] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -59,7 +61,6 @@ export default function RegistrationPage() {
     const base = {
       id: userId,
       username: formData.username,
-      password: formData.password,
     };
 
     switch (formData.role.toLowerCase()) {
@@ -68,24 +69,25 @@ export default function RegistrationPage() {
           ...base,
           first_name: formData.first_name,
           last_name: formData.last_name,
+          username: formData.username,
+          password: formData.password,
           delivery_longitude: parseFloat(formData.address_longitude || 0),
           delivery_latitude: parseFloat(formData.address_latitude || 0),
         };
       case "courier":
         return {
-          ...base,
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          work_id: formData.work_id,
+          id: userId,
+          username: formData.username,
+          password: formData.password,
+          work_id: Number(formData.work_id),
           status: formData.status || "available",
         };
       case "restaurant":
         return {
-          ...base,
+          id: userId,
           restaurant_name: formData.restaurant_name,
           restaurant_longitude: parseFloat(formData.address_longitude || 0),
           restaurant_latitude: parseFloat(formData.address_latitude || 0),
-          status: formData.status || "open",
         };
       default:
         return base;
@@ -95,27 +97,9 @@ export default function RegistrationPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!isLogin) {
-      if (!formData.role) {
-        setError("Please select a role.");
-        return;
-      }
-      if (formData.role === "customer" &&
-        (!formData.first_name || !formData.last_name ||
-          formData.address_longitude === "" || formData.address_latitude === "")) {
-        setError("Please complete all customer profile fields.");
-        return;
-      }
-      if (formData.role === "courier" &&
-        (!formData.first_name || !formData.last_name || !formData.work_id)) {
-        setError("Please complete all courier profile fields.");
-        return;
-      }
-      if (formData.role === "restaurant" &&
-        (!formData.restaurant_name || !formData.logo)) {
-        setError("Please provide the restaurant name and logo.");
-        return;
-      }
+    if (!isLogin && formData.role === "restaurant" && !formData.logo) {
+      setError("Please upload a restaurant logo.");
+      return;
     }
     setIsSubmitting(true);
     try {
@@ -126,7 +110,11 @@ export default function RegistrationPage() {
         body: JSON.stringify({
           username: formData.username,
           password: formData.password,
-          role: formData.role ? formData.role.toUpperCase() : null,
+          role: formData.role
+            ? formData.role === "restaurant"
+              ? "RESTAURANT_STAFF"
+              : formData.role.toUpperCase()
+            : null,
         }),
       });
       if (!response.ok) {
@@ -144,7 +132,7 @@ export default function RegistrationPage() {
 
       // Handle Supabase Storage uploads for restaurant roles.
       let menuUrl = null;
-      let logoUrl = null;
+      let uploadedLogoPath = null;
 
       if (formData.role === "restaurant") {
         try {
@@ -163,30 +151,32 @@ export default function RegistrationPage() {
           }
 
           if (formData.logo) {
-            const logoPath = `${userId}/logo_${Date.now()}_${formData.logo.name}`;
+            const logoObjectPath = `${userId}/logo_${Date.now()}_${formData.logo.name}`;
             const { error: logoError } = await supabase.storage
-              .from("logos")
-              .upload(logoPath, formData.logo);
+              .from(RESTAURANT_LOGO_BUCKET)
+              .upload(logoObjectPath, formData.logo);
 
-            if (!logoError) {
-              const { data: logoPublic } = supabase.storage
-                .from("logos")
-                .getPublicUrl(logoPath);
-              logoUrl = logoPublic.publicUrl;
+            if (logoError) {
+              console.error("Restaurant logo upload error:", logoError.message);
+              setError(`Account created, but logo upload failed: ${logoError.message}`);
+              return;
             }
+
+            uploadedLogoPath = logoObjectPath;
           }
         } catch (uploadErr) {
           console.error("Storage upload error:", uploadErr);
         }
       }
 
-      const payload = {
-        ...buildPayload(userId),
-        ...(formData.role === "restaurant" && {
-          menu_url: menuUrl,
-          logo_url: logoUrl,
-        }),
-      };
+      const payload =
+        formData.role === "restaurant"
+          ? {
+              ...buildPayload(userId),
+              restaurant_logo: uploadedLogoPath,
+              menu: menuUrl,
+            }
+          : buildPayload(userId);
 
       const tableName =
         formData.role === "restaurant"
@@ -201,6 +191,8 @@ export default function RegistrationPage() {
 
       if (dbError) {
         console.error("Database insert error:", dbError.message);
+        setError(`Account created, but profile could not be saved: ${dbError.message}`);
+        return;
       }
 
       setUser(userData);
@@ -215,6 +207,7 @@ export default function RegistrationPage() {
   const handleLogout = async () => {
     await fetch(`${API_URL}/logout`, { method: "POST", credentials: "include" });
     setUser(null);
+    setShowRestaurantLibrary(false);
     setError("");
     setFormData({
       role: "",
@@ -249,10 +242,9 @@ export default function RegistrationPage() {
       <nav></nav>
       <main>
         <h3>{isLogin ? "Log in" : "Register"}</h3>
-        <form onSubmit={handleSubmit}>
         {!isLogin && <section id="role-selection-container">
-          <label htmlFor="role-selection">Select Your Role:</label>
-          <select id="role-selection" name="role" value ={formData.role} onChange={handleChange} required>
+          <label>Select Your Role:</label>
+          <select id="role-selection" name="role" value ={formData.role} onChange={handleChange}>
               <option value="">Please select a role</option>
               <option value="customer">Customer</option>
               <option value="courier">Courier</option>
@@ -273,19 +265,19 @@ export default function RegistrationPage() {
             <>
               <div id="input-field" name="first_name">
                 <label htmlFor="first_name">First Name:</label>
-                <input type="text" placeholder="First Name" name="first_name" value={formData.first_name} onChange={handleChange} required />
+                <input type="text" placeholder="First Name" name="first_name" value={formData.first_name} onChange={handleChange} />
               </div>
               <div id="input-field" name="last_name">
                 <label htmlFor="last_name">Last Name:</label>
-                <input type="text" placeholder="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} required />
+                <input type="text" placeholder="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} />
               </div>
               <div id="input-field" name="address_longitude">
                 <label htmlFor="address_longitude">Address Longitude:</label>
-                <input type="number" placeholder="Address Longitude" name="address_longitude" value={formData.address_longitude} onChange={handleChange} required />
+                <input type="number" placeholder="Address Longitude" name="address_longitude" value={formData.address_longitude} onChange={handleChange} />
               </div>
               <div id="input-field" name="address_latitude">
                 <label htmlFor="address_latitude">Address Latitude:</label>
-                <input type="number" placeholder="Address Latitude" name="address_latitude" value={formData.address_latitude} onChange={handleChange} required />
+                <input type="number" placeholder="Address Latitude" name="address_latitude" value={formData.address_latitude} onChange={handleChange} />
               </div>
             </>
             )}
@@ -293,7 +285,7 @@ export default function RegistrationPage() {
             <>
               <div id="input-field" name="restaurant_name">
                 <label htmlFor="restaurant_name">Restaurant Name:</label>
-                <input type="text" placeholder="Restaurant Name" name="restaurant_name" value={formData.restaurant_name} onChange={handleChange} required />
+                <input type="text" placeholder="Restaurant Name" name="restaurant_name" value={formData.restaurant_name} onChange={handleChange} />
               </div>
               <div id="input-field" name="menu">
                 <label htmlFor="menu">Menu:</label>
@@ -301,31 +293,31 @@ export default function RegistrationPage() {
               </div>
               <div id="input-field" name="logo">
                 <label htmlFor="logo">Logo:</label>
-                <input type="file" accept=".jpg,.jpeg,.png,.gif,.pdf" name="logo" onChange={handleFileChange} required />
+                <input type="file" accept=".jpg,.jpeg,.png,.gif,.pdf" name="logo" onChange={handleFileChange} />
               </div>
             </>
           )}
           {!isLogin && formData.role === "courier" && (
-            <>
-              <div id="input-field" name="first_name">
-                <label htmlFor="first_name">First Name:</label>
-                <input type="text" placeholder="First Name" name="first_name" value={formData.first_name} onChange={handleChange} required />
-              </div>
-              <div id="input-field" name="last_name">
-                <label htmlFor="last_name">Last Name:</label>
-                <input type="text" placeholder="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} required />
-              </div>
-            </>
+            <div id="input-field" name="work_id">
+              <label htmlFor="work_id">Work ID:</label>
+              <input
+                type="number"
+                placeholder="Work ID"
+                name="work_id"
+                value={formData.work_id}
+                onChange={handleChange}
+                required
+              />
+            </div>
           )}
           {error && <p role="alert">{error}</p>}
-          <button type="submit" disabled={isSubmitting}>
+          <button type="submit" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? "Please wait..." : isLogin ? "Log in" : "Register"}
           </button>
           <button type="button" onClick={() => { setIsLogin(!isLogin); setError(""); }}>
             {isLogin ? "Create an account" : "Use an existing account"}
           </button>
-        </section>
-        </form>
+        </section> 
       </main>
       <footer>
         <p>&copy; 2023 Midnight Munchies. All rights reserved.</p>

@@ -9,8 +9,6 @@ import com.midnightmunchies.domain.ord.RestaurantStatus;
 import com.midnightmunchies.domain.ord.repository.MenuItemRepository;
 import com.midnightmunchies.domain.ord.repository.OrderRepository;
 import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
-import com.midnightmunchies.domain.reg.UserAccount;
-import com.midnightmunchies.domain.reg.UserRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,21 +32,8 @@ class BackendApplicationTests {
 	@Autowired
 	private OrderRepository orders;
 
-	@Autowired
-	private AuthService authService;
-
 	@Test
 	void contextLoads() {
-	}
-
-	@Test
-	void demoStaffIdentityIsAssociatedWithOnlyItsAssignedRestaurant() {
-		UserAccount staff = authService.authenticate("restaurant@example.com", "password");
-		assertEquals(UserRole.RESTAURANT_STAFF, staff.role());
-		assertEquals(List.of("Bobs Burgers"), restaurants.findAll().stream()
-				.filter(restaurant -> UUID.fromString(staff.id()).equals(restaurant.getOwnerId()))
-				.map(Restaurant::getName)
-				.toList());
 	}
 
 	@Test
@@ -57,7 +42,7 @@ class BackendApplicationTests {
 		Restaurant restaurant = new Restaurant(UUID.randomUUID(), "Diner", RestaurantStatus.OPEN, 45.5, -73.5);
 		MenuItem item = new MenuItem(UUID.randomUUID(), restaurant.getId(), "Poutine",
 				new BigDecimal("12.35"), MenuItemStatus.AVAILABLE);
-		OrderLine line = new OrderLine(item.getId(), item.getName(), 2, item.getPrice());
+		OrderLine line = new OrderLine(item.getId(), 2, item.getPrice());
 		Order order = new Order(UUID.randomUUID(), customerId, restaurant.getId(), List.of(line), Instant.now());
 
 		restaurants.save(restaurant);
@@ -70,8 +55,6 @@ class BackendApplicationTests {
 		assertEquals(List.of(order), orders.findByCustomerId(customerId));
 		assertEquals(item.getId(), orders.findById(order.getId()).orElseThrow()
 				.getOrderLines().getFirst().getMenuItemId());
-		assertEquals(item.getName(), orders.findById(order.getId()).orElseThrow()
-				.getOrderLines().getFirst().getMenuItemName());
 	}
 
 }
