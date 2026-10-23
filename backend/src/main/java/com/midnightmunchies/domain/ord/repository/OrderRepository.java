@@ -21,4 +21,6 @@ public interface OrderRepository {
 
 	/** Returns an unmodifiable snapshot of this customer's orders, in no guaranteed order. */
 	List<Order> findByCustomerId(UUID customerId);
+
+	List<Order> findPreparationQueue(UUID restaurantId);
 }
