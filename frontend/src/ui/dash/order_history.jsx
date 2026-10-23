@@ -1,18 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../api';
 import { formatPrice } from './menu_page/menu_format';
+import OrderEventHistory from './order_event_history';
+import { useCommandLog } from './output_console/command_log';
 
 export default function OrderHistory({ refreshVersion }) {
+  const { record } = useCommandLog();
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
   useEffect(() => {
     let active = true;
     api.orders().then((items) => {
-      if (active) { setOrders(items); setError(''); }
-    }).catch((loadError) => { if (active) setError(loadError.message); });
+      if (active) {
+        setOrders(items); setError('');
+        if (refresh > 0) record({ action: 'Refresh orders', outcome: 'success', message: 'Orders refreshed.' });
+      }
+    }).catch((loadError) => {
+      if (active) {
+        setError(loadError.message);
+        if (refresh > 0 || refreshVersion > 0) record({ action: 'Refresh orders', outcome: 'error', message: loadError.message, httpStatus: loadError.status });
+      }
+    });
     return () => { active = false; };
-  }, [refreshVersion, refresh]);
+  }, [refreshVersion, refresh, record]);
 
   return (
     <section className="order-history">
@@ -30,6 +41,7 @@ export default function OrderHistory({ refreshVersion }) {
               {line.quantity} × {line.menuItemName} · {formatPrice(line.unitPrice)} each
             </li>
           ))}</ul>
+          <OrderEventHistory orderId={order.id} restaurantId={order.restaurantId} />
         </article>
       ))}
     </section>

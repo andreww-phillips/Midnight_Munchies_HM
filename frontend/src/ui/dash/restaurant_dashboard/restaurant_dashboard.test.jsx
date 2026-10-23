@@ -251,7 +251,7 @@ describe('restaurant lifecycle commands', () => {
     api.startNextPreparation.mockResolvedValue(preparing);
     await renderDashboard();
     expect(button('Start next preparation').disabled).toBe(false);
-    expect(group('Preparation queue').querySelectorAll('button')).toHaveLength(1);
+    expect(group('Preparation queue').querySelectorAll(':scope > button')).toHaveLength(1);
     await click(button('Start next preparation'));
 
     expect(api.startNextPreparation).toHaveBeenCalledExactlyOnceWith(restaurant.id);
@@ -285,7 +285,7 @@ describe('restaurant lifecycle commands', () => {
     api.orders.mockResolvedValue([current]);
     api.preparationQueue.mockResolvedValue(status === 'ACCEPTED' ? [current] : []);
     await renderDashboard();
-    expect([...container.querySelector('article').querySelectorAll('button')].map((element) => element.textContent)).toEqual(controls);
+    expect([...container.querySelector('article').querySelectorAll('button')].map((element) => element.textContent)).toEqual([...controls, 'View event history']);
   });
 
   it.each([

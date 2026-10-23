@@ -2,8 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../../../api';
 import { formatPrice } from '../menu_page/menu_format';
 import './restaurant_dashboard.css';
+import { useCommandLog } from '../output_console/command_log';
+import OrderEventHistory from '../order_event_history';
 
 function OrderCard({ order, disabled = false, onCommand }) {
+  const { record } = useCommandLog();
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState('');
   return (
@@ -27,6 +30,7 @@ function OrderCard({ order, disabled = false, onCommand }) {
           const trimmedReason = reason.trim();
           if (!trimmedReason) {
             setReasonError('A rejection reason is required.');
+            record({ action: 'Reject order', outcome: 'error', orderId: order.id, restaurantId: order.restaurantId, message: 'A rejection reason is required.' });
             return;
           }
           setReasonError('');
@@ -44,6 +48,7 @@ function OrderCard({ order, disabled = false, onCommand }) {
       </div>}
       {onCommand && order.status === 'PREPARING' && <button className="primary-button" type="button"
         disabled={disabled} onClick={() => onCommand('ready', order)}>Mark Ready</button>}
+      <OrderEventHistory orderId={order.id} restaurantId={order.restaurantId} disabled={disabled} />
     </article>
   );
 }
@@ -73,6 +78,7 @@ async function readDashboard(restaurantId) {
 }
 
 function RestaurantOrders({ restaurant, onSessionExpired }) {
+  const { record } = useCommandLog();
   const [data, setData] = useState({ orders: [], queue: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -93,17 +99,21 @@ function RestaurantOrders({ restaurant, onSessionExpired }) {
     let active = true;
     readDashboard(restaurant.id)
       .then((snapshot) => {
-        if (active) { setData(snapshot); setLoadFailed(false); }
+        if (active) {
+          setData(snapshot); setLoadFailed(false);
+          if (refresh > 0) record({ action: 'Refresh restaurant orders', outcome: 'success', restaurantId: restaurant.id, message: 'Orders and preparation queue refreshed.' });
+        }
       })
       .catch((loadError) => {
         if (!active) return;
         setError(loadError.message);
         setLoadFailed(true);
+        if (refresh > 0) record({ action: 'Refresh restaurant orders', outcome: 'error', restaurantId: restaurant.id, message: loadError.message, httpStatus: loadError.status });
         if (loadError.status === 401) onSessionExpired?.('Your session expired. Please log in again.');
       })
       .finally(() => { if (active) { setLoading(false); requestBusy.current = false; } });
     return () => { active = false; };
-  }, [restaurant.id, refresh, onSessionExpired]);
+  }, [restaurant.id, refresh, onSessionExpired, record]);
 
   const runCommand = async (action, order, reason) => {
     if (requestBusy.current || loadFailed) return;
@@ -115,6 +125,7 @@ function RestaurantOrders({ restaurant, onSessionExpired }) {
       ready: ['Marking order ready...', () => api.markOrderReady(restaurant.id, order.id)]
     };
     const [message, operation] = operations[action];
+    const actionName = { accept: 'Accept order', reject: 'Reject order', next: 'Start preparation', ready: 'Mark order ready' }[action];
     setPending(message);
     setError('');
     setNotice('');
@@ -124,7 +135,11 @@ function RestaurantOrders({ restaurant, onSessionExpired }) {
       let updatedOrder;
       try {
         updatedOrder = await operation();
+        record({ action: actionName, outcome: 'success', orderId: updatedOrder.id, restaurantId: restaurant.id, status: updatedOrder.status,
+          message: `Order #${updatedOrder.id} is now ${updatedOrder.status}.` });
       } catch (commandError) {
+        record({ action: actionName, outcome: 'error', orderId: order?.id, restaurantId: restaurant.id,
+          httpStatus: commandError.status, message: commandError.message });
         if (!mounted.current) return;
         setError(commandError.message);
         if (commandError.status === 401) {
@@ -145,6 +160,8 @@ function RestaurantOrders({ restaurant, onSessionExpired }) {
         const snapshot = await readDashboard(restaurant.id);
         if (mounted.current) { setData(snapshot); setLoadFailed(false); }
       } catch (refreshError) {
+        record({ action: 'Refresh restaurant orders', outcome: 'error', restaurantId: restaurant.id,
+          message: refreshError.message, httpStatus: refreshError.status });
         if (!mounted.current) return;
         setLoadFailed(true);
         setError((previous) => successMessage
@@ -191,17 +208,17 @@ function RestaurantOrders({ restaurant, onSessionExpired }) {
         <OrderGroup title="Incoming orders" orders={data.orders.filter((order) => order.status === 'PLACED')}
           emptyMessage="No incoming orders." disabled={busy} onCommand={runCommand} />
         <OrderGroup title="Preparation queue" orders={data.queue} queue
-          emptyMessage="No accepted orders waiting for preparation.">
+          emptyMessage="No accepted orders waiting for preparation." disabled={busy}>
           <button className="primary-button" type="button" disabled={busy || data.queue.length === 0}
             onClick={() => runCommand('next')}>Start next preparation</button>
         </OrderGroup>
         <OrderGroup title="Preparing" orders={data.orders.filter((order) => order.status === 'PREPARING')}
           emptyMessage="No orders currently preparing." disabled={busy} onCommand={runCommand} />
         <OrderGroup title="Ready" orders={data.orders.filter((order) => order.status === 'READY')}
-          emptyMessage="No orders ready yet." />
+          emptyMessage="No orders ready yet." disabled={busy} />
         <OrderGroup title="Other orders" orders={data.orders.filter((order) =>
           !['PLACED', 'ACCEPTED', 'PREPARING', 'READY'].includes(order.status))}
-          emptyMessage="No other orders." />
+          emptyMessage="No other orders." disabled={busy} />
       </>}
     </div>
   );
