@@ -13,9 +13,10 @@ const SEED_RESTAURANTS = [
 const logoUrl = (path) =>
   path ? supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl : "";
 
-export default function RestaurantList() {
+export default function RestaurantList({ role }) {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const normalizedRole = role?.toUpperCase();
 
   const loadRestaurants = async () => {
     setLoading(true);
@@ -52,29 +53,39 @@ export default function RestaurantList() {
 
   return (
     <>
-        <main>
-        <h3>Restaurants</h3>
+    <main>
+      <h3>Restaurants</h3>
 
-        {loading && <p>Loading...</p>}
-        {!loading && restaurants.length === 0 && <p>No restaurants yet.</p>}
+      {loading && <p>Loading...</p>}
+      {!loading && restaurants.length === 0 && <p>No restaurants yet.</p>}
 
-        <section id="restaurant-list">
-            {restaurants.map((r) => (
-            <div className="restaurant-card" key={r.id}>
-                <img
-                src={logoUrl(r.restaurant_logo)}
-                alt={`${r.restaurant_name} logo`}
-                width={120}
-                height={120}
-                />
-                <button>{r.restaurant_name}</button>
-            </div>
-            ))}
-        </section>
-        </main>
-        <footer>
-            <p>&copy; 2023 Midnight Munchies. All rights reserved.</p>
-        </footer>
+      <section id="restaurant-list">
+        {restaurants.map((r) => (
+          <div className="restaurant-card" key={r.id}>
+            <img
+              src={logoUrl(r.restaurant_logo)}
+              alt={`${r.restaurant_name} logo`}
+              width={120}
+              height={120}
+            />
+            <h4>{r.restaurant_name}</h4>
+            <button type="button" name="menu">Menu</button>
+            {normalizedRole === "COURIER" && (
+              <button type="button" name="orders">Orders</button> //orders to deliver and status
+            )}
+            {normalizedRole === "RESTAURANT_STAFF" && (
+              <>
+                <button type="button" name="orders">Orders</button> //orders to prep
+                <button type="button" name="edit">Edit</button> //edit menu and status 
+              </>
+            )}
+          </div>
+        ))}
+      </section>
+    </main>
+    <footer>
+      <p>&copy; 2023 Midnight Munchies. All rights reserved.</p>
+    </footer>
     </>
   );
 }

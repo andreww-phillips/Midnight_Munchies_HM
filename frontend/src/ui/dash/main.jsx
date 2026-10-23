@@ -6,7 +6,7 @@ import './index.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <RegistrationPage />
-    {/* <RestaurantList /> */}
+    {/* <RegistrationPage /> */}
+    <RestaurantList />
   </StrictMode>,
 )

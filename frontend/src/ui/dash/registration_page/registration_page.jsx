@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../../supabaseClient";
+import RestaurantList from "../restaurant_library/restaurant_library.jsx";
 
 const API_URL = "http://localhost:8080/api/auth";
 
@@ -211,11 +212,12 @@ export default function RegistrationPage() {
 
   if (user) {
     return (
-      <main>
+      <div>
         <h3>Welcome, {user.username}</h3>
         <p>Role: {user.role}</p>
         <button type="button" onClick={handleLogout}>Log out</button>
-      </main>
+        <RestaurantList role={user.role} />
+      </div>
     );
   }
 
