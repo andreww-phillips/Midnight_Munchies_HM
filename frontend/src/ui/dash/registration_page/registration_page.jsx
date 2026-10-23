@@ -7,6 +7,7 @@ const API_URL = "http://localhost:8080/api/auth";
 export default function RegistrationPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [user, setUser] = useState(null);
+  const [showRestaurantLibrary, setShowRestaurantLibrary] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -193,6 +194,7 @@ export default function RegistrationPage() {
   const handleLogout = async () => {
     await fetch(`${API_URL}/logout`, { method: "POST", credentials: "include" });
     setUser(null);
+    setShowRestaurantLibrary(false);
     setError("");
     setFormData({
       role: "",
@@ -216,7 +218,27 @@ export default function RegistrationPage() {
         <h3>Welcome, {user.username}</h3>
         <p>Role: {user.role}</p>
         <button type="button" onClick={handleLogout}>Log out</button>
-        <RestaurantList role={user.role} />
+        {!showRestaurantLibrary && (
+          <button
+            type="button"
+            onClick={() => setShowRestaurantLibrary(true)}
+          >
+            Restaurant Library
+          </button>
+        )}
+        {showRestaurantLibrary ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowRestaurantLibrary(false)}
+            >
+              Back
+            </button>
+            <RestaurantList role={user.role} />
+          </>
+        ) : (
+          <RestaurantList role={user.role} />
+        )}
       </div>
     );
   }
