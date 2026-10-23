@@ -2,6 +2,9 @@ package com.midnightmunchies.application;
 
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
+import com.midnightmunchies.domain.ord.Restaurant;
+import com.midnightmunchies.domain.ord.RestaurantStatus;
+import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -14,10 +17,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class AuthService {
     private final Map<String, UserAccount> users = new ConcurrentHashMap<>();
+    private final RestaurantRepository restaurants;
 
-    public AuthService() {
+    public AuthService(RestaurantRepository restaurants) {
+        this.restaurants = restaurants;
         seed("customer@example.com", "password", UserRole.CUSTOMER);
-        seed("restaurant@example.com", "password", UserRole.RESTAURANT_STAFF);
+        seed(UUID.fromString("30000000-0000-0000-0000-000000000001"),
+                "restaurant@example.com", "password", UserRole.RESTAURANT_STAFF);
         seed("courier@example.com", "password", UserRole.COURIER);
         seed("operator@example.com", "password", UserRole.PLATFORM_OPERATOR);
     }
@@ -28,6 +34,26 @@ public class AuthService {
             return null;
         }
         return account;
+    }
+
+    public UserAccount register(String username, String password, UserRole role,
+                                String restaurantName, String restaurantLogo, String menu) {
+        String name = restaurantName == null ? normalize(username) + "'s restaurant" : restaurantName.trim();
+        if (role == UserRole.RESTAURANT_STAFF && name.isBlank()) {
+            throw new IllegalArgumentException("Restaurant name is required");
+        }
+        UserAccount account = register(username, password, role);
+        try {
+            if (role == UserRole.RESTAURANT_STAFF) {
+                UUID ownerId = UUID.fromString(account.id());
+                restaurants.save(new Restaurant(ownerId, ownerId, name, RestaurantStatus.OPEN,
+                        0, 0, restaurantLogo, menu));
+            }
+            return account;
+        } catch (RuntimeException exception) {
+            users.remove(normalize(username), account);
+            throw exception;
+        }
     }
 
     public UserAccount register(String username, String password, UserRole role) {
@@ -48,7 +74,11 @@ public class AuthService {
     }
 
     private void seed(String username, String password, UserRole role) {
-        users.put(username, new UserAccount(UUID.randomUUID().toString(), username, hash(password), role));
+        seed(UUID.randomUUID(), username, password, role);
+    }
+
+    private void seed(UUID id, String username, String password, UserRole role) {
+        users.put(username, new UserAccount(id.toString(), username, hash(password), role));
     }
 
     private boolean matches(String password, String passwordHash) {

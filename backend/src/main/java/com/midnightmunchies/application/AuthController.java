@@ -38,7 +38,8 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<UserResponse> register(@RequestBody RegisterRequest request, HttpSession session) {
         try {
-            UserAccount account = authService.register(request.username(), request.password(), request.role());
+            UserAccount account = authService.register(request.username(), request.password(), request.role(),
+                    request.restaurantName(), request.restaurantLogo(), request.menu());
             session.setAttribute(SESSION_USER, account);
             return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(account));
         } catch (IllegalArgumentException exception) {
@@ -68,7 +69,8 @@ public class AuthController {
     public record LoginRequest(String username, String password) {
     }
 
-    public record RegisterRequest(String username, String password, UserRole role) {
+    public record RegisterRequest(String username, String password, UserRole role,
+                                  String restaurantName, String restaurantLogo, String menu) {
     }
 
     public record UserResponse(String id, String username, UserRole role, String message) {

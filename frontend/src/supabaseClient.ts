@@ -1,10 +1,7 @@
 /// <reference types="vite/client" />
 import { createClient } from '@supabase/supabase-js';
 
-// Let's inspect what environment variables Vite has loaded
-console.log("🔍 Vite Environment Check:", import.meta.env);
+const url = import.meta.env.VITE_SUPABASE_URL;
+const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = url && key ? createClient(url, key) : null;

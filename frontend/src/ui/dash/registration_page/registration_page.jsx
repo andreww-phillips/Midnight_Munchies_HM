@@ -1,14 +1,20 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../../../supabaseClient";
 import RestaurantList from "../restaurant_library/restaurant_library.jsx";
+import { api } from "../../../api";
 
-const API_URL = "http://localhost:8080/api/auth";
-const RESTAURANT_LOGO_BUCKET = "Restaurant Logos";
+function readFile(file) {
+  if (!file) return Promise.resolve(null);
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Unable to read the selected file."));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function RegistrationPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [user, setUser] = useState(null);
-  const [showRestaurantLibrary, setShowRestaurantLibrary] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -28,14 +34,12 @@ export default function RegistrationPage() {
   });
 
   useEffect(() => {
-    fetch(`${API_URL}/me`, { credentials: "include" })
-      .then((response) => {
-        if (response.ok) {
-          return response.json().then(setUser);
-        }
-        return null;
-      })
-      .catch(() => setError("Unable to connect to the authentication service."));
+    let active = true;
+    api.currentUser().then((account) => { if (active) setUser(account); })
+      .catch((sessionError) => {
+        if (active && sessionError.status !== 401) setError(sessionError.message);
+      });
+    return () => { active = false; };
   }, []);
 
   // Handle standard text/select inputs
@@ -56,44 +60,6 @@ export default function RegistrationPage() {
     }));
   };
 
-  // Build role-specific payload for registration
-  const buildPayload = (userId) => {
-    const base = {
-      id: userId,
-      username: formData.username,
-    };
-
-    switch (formData.role.toLowerCase()) {
-      case "customer":
-        return {
-          ...base,
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          username: formData.username,
-          password: formData.password,
-          delivery_longitude: parseFloat(formData.address_longitude || 0),
-          delivery_latitude: parseFloat(formData.address_latitude || 0),
-        };
-      case "courier":
-        return {
-          id: userId,
-          username: formData.username,
-          password: formData.password,
-          work_id: Number(formData.work_id),
-          status: formData.status || "available",
-        };
-      case "restaurant":
-        return {
-          id: userId,
-          restaurant_name: formData.restaurant_name,
-          restaurant_longitude: parseFloat(formData.address_longitude || 0),
-          restaurant_latitude: parseFloat(formData.address_latitude || 0),
-        };
-      default:
-        return base;
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -112,119 +78,39 @@ export default function RegistrationPage() {
         setError("Please complete all courier profile fields.");
         return;
       }
-      if (formData.role === "restaurant" &&
-        (!formData.restaurant_name || !formData.logo)) {
-        setError("Please provide the restaurant name and logo.");
+      if (formData.role === "restaurant" && !formData.restaurant_name.trim()) {
+        setError("Please provide the restaurant name.");
         return;
       }
     }
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${API_URL}/${isLogin ? "login" : "register"}`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: formData.username,
-          password: formData.password,
-          role: formData.role
-            ? formData.role === "restaurant"
-              ? "RESTAURANT_STAFF"
-              : formData.role.toUpperCase()
-            : null,
-        }),
-      });
-      if (!response.ok) {
-        setError(isLogin ? "Invalid username or password." : "Registration could not be completed.");
-        return;
-      }
-      const userData = await response.json();
-
       if (isLogin) {
-        setUser(userData);
-        return;
+        setUser(await api.login(formData.username, formData.password));
+      } else {
+        const role = formData.role === "restaurant" ? "RESTAURANT_STAFF" : formData.role.toUpperCase();
+        const details = formData.role === "restaurant" ? {
+          restaurantName: formData.restaurant_name.trim(),
+          restaurantLogo: await readFile(formData.logo),
+          menu: await readFile(formData.menu),
+        } : {};
+        setUser(await api.register(formData.username, formData.password, role, details));
       }
-
-      const userId = userData.id || userData.username;
-
-      // Handle Supabase Storage uploads for restaurant roles.
-      let menuUrl = null;
-      let uploadedLogoPath = null;
-
-      if (formData.role === "restaurant") {
-        try {
-          if (formData.menu) {
-            const menuPath = `${userId}/menu_${Date.now()}_${formData.menu.name}`;
-            const { error: menuError } = await supabase.storage
-              .from("menus")
-              .upload(menuPath, formData.menu);
-
-            if (!menuError) {
-              const { data: menuPublic } = supabase.storage
-                .from("menus")
-                .getPublicUrl(menuPath);
-              menuUrl = menuPublic.publicUrl;
-            }
-          }
-
-          if (formData.logo) {
-            const logoObjectPath = `${userId}/logo_${Date.now()}_${formData.logo.name}`;
-            const { error: logoError } = await supabase.storage
-              .from(RESTAURANT_LOGO_BUCKET)
-              .upload(logoObjectPath, formData.logo);
-
-            if (logoError) {
-              console.error("Restaurant logo upload error:", logoError.message);
-              setError(`Account created, but logo upload failed: ${logoError.message}`);
-              return;
-            }
-
-            uploadedLogoPath = logoObjectPath;
-          }
-        } catch (uploadErr) {
-          console.error("Storage upload error:", uploadErr);
-        }
-      }
-
-      const payload =
-        formData.role === "restaurant"
-          ? {
-              ...buildPayload(userId),
-              restaurant_logo: uploadedLogoPath,
-              menu: menuUrl,
-            }
-          : buildPayload(userId);
-
-      const tableName =
-        formData.role === "restaurant"
-          ? "Restaurant"
-          : formData.role === "courier"
-            ? "Courrier_Info"
-            : "Customer_Info";
-
-      const { error: dbError } = await supabase
-        .from(tableName)
-        .insert([payload]);
-
-      if (dbError) {
-        console.error("Database insert error:", dbError.message);
-        setError(`Account created, but profile could not be saved: ${dbError.message}`);
-        return;
-      }
-
-      setUser(userData);
     } catch (err) {
-      console.error(err);
-      setError("Unable to connect to the authentication service.");
+      setError(err.status === 401 ? "Invalid username or password." : err.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleLogout = async () => {
-    await fetch(`${API_URL}/logout`, { method: "POST", credentials: "include" });
+    try {
+      await api.logout();
+    } catch (logoutError) {
+      setError(logoutError.message);
+      return;
+    }
     setUser(null);
-    setShowRestaurantLibrary(false);
     setError("");
     setFormData({
       role: "",
@@ -244,58 +130,63 @@ export default function RegistrationPage() {
 
   if (user) {
     return (
-      <div>
-        <h3>Welcome, {user.username}</h3>
-        <p>Role: {user.role}</p>
-        <button type="button" onClick={handleLogout}>Log out</button>
-        <RestaurantList role={user.role} />
+      <div className="app-shell">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">MIDNIGHT MUNCHIES</p>
+            <h1>Welcome, {user.username}</h1>
+            <p className="muted">Role: {user.role}</p>
+          </div>
+          <button className="secondary-button" type="button" onClick={handleLogout}>Log out</button>
+        </header>
+        {error && <p role="alert">{error}</p>}
+        <RestaurantList user={user} />
       </div>
     );
   }
 
   return (
     <>
-      <header></header>
-      <nav></nav>
-      <main>
-        <h3>{isLogin ? "Log in" : "Register"}</h3>
-        <form onSubmit={handleSubmit}>
+      <main className="auth-card">
+        <p className="eyebrow">MIDNIGHT MUNCHIES</p>
+        <h1>{isLogin ? "Welcome back" : "Create your account"}</h1>
+        <p className="muted">Order your favourite food without the late-night wait.</p>
+        <form id="registration-form-container" onSubmit={handleSubmit}>
         {!isLogin && <section id="role-selection-container">
           <label htmlFor="role-selection">Select Your Role:</label>
-          <select id="role-selection" name="role" value ={formData.role} onChange={handleChange} required>
+          <select id="role-selection" name="role" value ={formData.role} onChange={handleChange} disabled={isSubmitting} required>
               <option value="">Please select a role</option>
               <option value="customer">Customer</option>
               <option value="courier">Courier</option>
               <option value="restaurant">Restaurant Staff</option>
           </select>
         </section>}
-        <section id="registration-form-container">
           <div id="input-field">
             <label htmlFor="username">Username:</label>
-            <input type="text" placeholder="Username" name="username" value={formData.username} onChange={handleChange} required />
+            <input id="username" type="text" placeholder="Username" name="username" value={formData.username} onChange={handleChange} disabled={isSubmitting} required />
           </div>
           <div id="input-field">
             <label htmlFor="password">Password:</label>
-            <input type="password" placeholder="Password" name="password" value={formData.password} onChange={handleChange} required />
+            <input id="password" type="password" placeholder="Password" name="password" value={formData.password} onChange={handleChange} disabled={isSubmitting} required />
           </div>
 
           {!isLogin && formData.role === "customer" && (
             <>
               <div id="input-field" name="first_name">
                 <label htmlFor="first_name">First Name:</label>
-                <input type="text" placeholder="First Name" name="first_name" value={formData.first_name} onChange={handleChange} required />
+                <input id="first_name" type="text" placeholder="First Name" name="first_name" value={formData.first_name} onChange={handleChange} required />
               </div>
               <div id="input-field" name="last_name">
                 <label htmlFor="last_name">Last Name:</label>
-                <input type="text" placeholder="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} required />
+                <input id="last_name" type="text" placeholder="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} required />
               </div>
               <div id="input-field" name="address_longitude">
                 <label htmlFor="address_longitude">Address Longitude:</label>
-                <input type="number" placeholder="Address Longitude" name="address_longitude" value={formData.address_longitude} onChange={handleChange} required />
+                <input id="address_longitude" type="number" step="any" min="-180" max="180" placeholder="Address Longitude" name="address_longitude" value={formData.address_longitude} onChange={handleChange} required />
               </div>
               <div id="input-field" name="address_latitude">
                 <label htmlFor="address_latitude">Address Latitude:</label>
-                <input type="number" placeholder="Address Latitude" name="address_latitude" value={formData.address_latitude} onChange={handleChange} required />
+                <input id="address_latitude" type="number" step="any" min="-90" max="90" placeholder="Address Latitude" name="address_latitude" value={formData.address_latitude} onChange={handleChange} required />
               </div>
             </>
             )}
@@ -303,15 +194,15 @@ export default function RegistrationPage() {
             <>
               <div id="input-field" name="restaurant_name">
                 <label htmlFor="restaurant_name">Restaurant Name:</label>
-                <input type="text" placeholder="Restaurant Name" name="restaurant_name" value={formData.restaurant_name} onChange={handleChange} required />
+                <input id="restaurant_name" type="text" placeholder="Restaurant Name" name="restaurant_name" value={formData.restaurant_name} onChange={handleChange} required />
               </div>
               <div id="input-field" name="menu">
-                <label htmlFor="menu">Menu:</label>
-                <input type="file" accept=".pdf,.doc,.docx,.txt" name="menu" onChange={handleFileChange} />
+                <label htmlFor="menu">Menu file (optional):</label>
+                <input id="menu" type="file" accept=".pdf,.doc,.docx,.txt" name="menu" onChange={handleFileChange} />
               </div>
               <div id="input-field" name="logo">
-                <label htmlFor="logo">Logo:</label>
-                <input type="file" accept=".jpg,.jpeg,.png,.gif,.pdf" name="logo" onChange={handleFileChange} required />
+                <label htmlFor="logo">Logo (optional):</label>
+                <input id="logo" type="file" accept=".jpg,.jpeg,.png,.gif,.pdf" name="logo" onChange={handleFileChange} />
               </div>
             </>
           )}
@@ -319,6 +210,7 @@ export default function RegistrationPage() {
             <div id="input-field" name="work_id">
               <label htmlFor="work_id">Work ID:</label>
               <input
+                id="work_id"
                 type="number"
                 placeholder="Work ID"
                 name="work_id"
@@ -329,13 +221,12 @@ export default function RegistrationPage() {
             </div>
           )}
           {error && <p role="alert">{error}</p>}
-          <button type="submit" disabled={isSubmitting}>
+          <button className="primary-button" type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Please wait..." : isLogin ? "Log in" : "Register"}
           </button>
-          <button type="button" onClick={() => { setIsLogin(!isLogin); setError(""); }}>
+          <button className="link-button" type="button" disabled={isSubmitting} onClick={() => { setIsLogin(!isLogin); setError(""); }}>
             {isLogin ? "Create an account" : "Use an existing account"}
           </button>
-        </section>
         </form>
       </main>
       <footer>

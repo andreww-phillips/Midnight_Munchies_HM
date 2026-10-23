@@ -1,6 +1,7 @@
 package com.midnightmunchies.application;
 
 import com.midnightmunchies.domain.ord.MenuItem;
+import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderLine;
 import com.midnightmunchies.domain.ord.Restaurant;
@@ -12,6 +13,7 @@ import com.midnightmunchies.domain.reg.UserAccount;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +47,40 @@ public class RealOrdService implements OrdService {
     }
 
     @Override
+    public MenuItem addMenuItem(UUID restaurantId, String name, BigDecimal price, HttpSession session) {
+        requireRestaurant(restaurantId);
+        requireItemDetails(name, price);
+        MenuItem item = new MenuItem(UUID.randomUUID(), restaurantId, name, price, MenuItemStatus.AVAILABLE);
+        return menuItemRepository.save(item);
+    }
+
+    @Override
+    public MenuItem editMenuItem(UUID restaurantId, UUID menuItemId, String name, BigDecimal price, HttpSession session) {
+        MenuItem current = requireMenuItem(restaurantId, menuItemId);
+        requireItemDetails(name, price);
+        MenuItem replacement = new MenuItem(current.getId(), current.getRestaurantId(), name, price, current.getStatus(),
+                current.getImage(), current.getDescription());
+        return menuItemRepository.save(replacement);
+    }
+
+    @Override
+    public void removeMenuItem(UUID restaurantId, UUID menuItemId, HttpSession session) {
+        MenuItem current = requireMenuItem(restaurantId, menuItemId);
+        menuItemRepository.deleteById(current.getId());
+    }
+
+    @Override
+    public MenuItem changeMenuItemAvailability(UUID restaurantId, UUID menuItemId, MenuItemStatus status, HttpSession session) {
+        MenuItem current = requireMenuItem(restaurantId, menuItemId);
+        if (status == null) {
+            throw new IllegalArgumentException("Menu item status is required");
+        }
+        MenuItem replacement = new MenuItem(current.getId(), current.getRestaurantId(),
+                current.getName(), current.getPrice(), status, current.getImage(), current.getDescription());
+        return menuItemRepository.save(replacement);
+    }
+
+    @Override
     public Order placeOrder(UUID restaurantId, List<OrderLineRequest> lines, HttpSession session) {
         UserAccount user = currentUser(session);
         Restaurant restaurant = restaurantRepository.findById(restaurantId)
@@ -63,7 +99,7 @@ public class RealOrdService implements OrdService {
                     || item.getStatus() != com.midnightmunchies.domain.ord.MenuItemStatus.AVAILABLE) {
                 throw new IllegalArgumentException("Menu item is unavailable for this restaurant");
             }
-            return new OrderLine(item.getId(), line.quantity(), item.getPrice());
+            return new OrderLine(item.getId(), item.getName(), line.quantity(), item.getPrice());
         }).toList();
 
         Order order = new Order(UUID.randomUUID(), UUID.fromString(user.id()), restaurantId, orderLines, Instant.now());
@@ -77,5 +113,30 @@ public class RealOrdService implements OrdService {
 
     private UserAccount currentUser(HttpSession session) {
         return (UserAccount) session.getAttribute(SESSION_USER);
+    }
+
+    private void requireRestaurant(UUID restaurantId) {
+        if (restaurantId == null || restaurantRepository.findById(restaurantId).isEmpty()) {
+            throw new IllegalArgumentException("Restaurant does not exist");
+        }
+    }
+
+    private MenuItem requireMenuItem(UUID restaurantId, UUID menuItemId) {
+        requireRestaurant(restaurantId);
+        if (menuItemId == null) {
+            throw new IllegalArgumentException("Menu item ID is required");
+        }
+        MenuItem item = menuItemRepository.findById(menuItemId)
+                .orElseThrow(() -> new MenuItemNotFoundException("Menu item does not exist for this restaurant"));
+        if (!item.getRestaurantId().equals(restaurantId)) {
+            throw new MenuItemNotFoundException("Menu item does not exist for this restaurant");
+        }
+        return item;
+    }
+
+    private void requireItemDetails(String name, BigDecimal price) {
+        if (name == null || price == null) {
+            throw new IllegalArgumentException("Menu item name and price are required");
+        }
     }
 }

@@ -12,12 +12,19 @@ public final class Restaurant {
 	private final RestaurantStatus status;
 	private final double latitude;
 	private final double longitude;
+	private final String logo;
+	private final String menu;
 
 	public Restaurant(UUID id, String name, RestaurantStatus status, double latitude, double longitude) {
 		this(id, null, name, status, latitude, longitude);
 	}
 
 	public Restaurant(UUID id, UUID ownerId, String name, RestaurantStatus status, double latitude, double longitude) {
+		this(id, ownerId, name, status, latitude, longitude, null, null);
+	}
+
+	public Restaurant(UUID id, UUID ownerId, String name, RestaurantStatus status, double latitude, double longitude,
+			String logo, String menu) {
 		this.id = Objects.requireNonNull(id, "id must not be null");
 		this.ownerId = ownerId;
 		this.name = OrdValidation.requireName(name);
@@ -30,6 +37,8 @@ public final class Restaurant {
 		}
 		this.latitude = latitude;
 		this.longitude = longitude;
+		this.logo = logo;
+		this.menu = menu;
 	}
 
 	public UUID getId() {
@@ -55,4 +64,8 @@ public final class Restaurant {
 	public double getLongitude() {
 		return longitude;
 	}
+
+	public String getLogo() { return logo; }
+
+	public String getMenu() { return menu; }
 }

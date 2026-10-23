@@ -20,7 +20,9 @@ async function request(path, options = {}) {
     }
     if (response.status === 401) message = message === `Request failed (401)` ? "Please log in to continue." : message;
     if (response.status === 403) message = message === `Request failed (403)` ? "You do not have permission to perform this action." : message;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   if (response.status === 204) return null;
@@ -33,13 +35,28 @@ export const api = {
     method: "POST",
     body: JSON.stringify({ username, password })
   }),
-  register: (username, password, role = "CUSTOMER") => request("/api/auth/register", {
+  register: (username, password, role = "CUSTOMER", details = {}) => request("/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ username, password, role })
+    body: JSON.stringify({ ...details, username, password, role })
   }),
   logout: () => request("/api/auth/logout", { method: "POST" }),
   restaurants: () => request("/api/ord/restaurants"),
   menu: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/menu`),
+  addMenuItem: (restaurantId, name, price) => request(`/api/ord/restaurants/${restaurantId}/menu`, {
+    method: "POST",
+    body: JSON.stringify({ name, price })
+  }),
+  editMenuItem: (restaurantId, menuItemId, name, price) => request(`/api/ord/restaurants/${restaurantId}/menu/${menuItemId}`, {
+    method: "PUT",
+    body: JSON.stringify({ name, price })
+  }),
+  removeMenuItem: (restaurantId, menuItemId) => request(`/api/ord/restaurants/${restaurantId}/menu/${menuItemId}`, {
+    method: "DELETE"
+  }),
+  changeMenuItemAvailability: (restaurantId, menuItemId, status) => request(`/api/ord/restaurants/${restaurantId}/menu/${menuItemId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status })
+  }),
   placeOrder: (restaurantId, lines) => request(`/api/ord/restaurants/${restaurantId}/orders`, {
     method: "POST",
     body: JSON.stringify({ lines })

@@ -38,6 +38,18 @@ Midnight_Munchies/
 The backend and frontend run as separate processes. Start each one in its own
 terminal and leave both terminals open.
 
+### Local configuration
+
+The application now runs as an **in-memory simulator**. No Supabase account,
+`.env` credentials, database connection, or SQL migration is required. Existing
+Supabase entries in `frontend/.env` are not used by registration, browsing,
+menu management, or ordering.
+
+The backend defaults to `catalog.mode=memory` and seeds the local restaurant and
+menu catalog. Accounts, restaurants, menus and orders live for the lifetime of
+the backend process and reset when it restarts. The frontend uses the backend
+API at `http://localhost:8080`; `VITE_API_URL` can override that address if needed.
+
 ### Terminal 1: Backend
 
 From the repository root, change to `backend/`.
@@ -63,7 +75,7 @@ that `BackendApplication` has started before using the frontend.
 
 From the repository root, change to `frontend/`.
 
-Install dependencies the first time:
+Install dependencies the first time and after pulling dependency changes:
 
 ```bash
 npm ci
@@ -101,5 +113,35 @@ Run frontend linting and a production build from `frontend/`:
 
 ```bash
 npm run lint
+npm run test
 npm run build
 ```
+
+Backend tests use memory or an isolated local HTTP fixture; they never access
+the shared Supabase database. Frontend tests mock backend API calls.
+
+## Verifying issue 7
+
+1. Start the backend and frontend. No database setup is needed.
+2. Log in as `restaurant@example.com` with password `password`. Open
+   **Bobs Burgers** and select **Edit menu**. This demo account owns that restaurant.
+   Alternatively, register **Restaurant Staff** with a username, password and
+   restaurant name; the backend creates its owned restaurant immediately. Logo
+   and menu-file selections are optional and kept locally in memory.
+3. Add **Drink / 3.99**, **French Fries / 5.99**, and another **Drink / 3.99**.
+   Menu items require only a name and price. Names and prices may repeat within
+   and across restaurants.
+4. Edit a name or price, mark an item sold out and available again, then remove
+   an item. Staff can only manage their own restaurant's menu.
+5. Use a private browser session to log in as `customer@example.com` with password
+   `password`, or register a customer account. Browse the menu and place an order.
+   Sold-out and removed items cannot be ordered.
+6. After placing an order, edit or remove the item as staff. Refresh the customer's
+   orders: the original item name, unit price and quantity remain unchanged.
+
+Other demo logins are `courier@example.com` and `operator@example.com`, both with
+password `password`. Couriers can browse; menu management is restricted to owning
+restaurant staff. All simulator changes reset when the backend restarts.
+
+See [the issue 7 integration notes](docs/issue-7-integration.md) for the exact
+regression history and current implementation.

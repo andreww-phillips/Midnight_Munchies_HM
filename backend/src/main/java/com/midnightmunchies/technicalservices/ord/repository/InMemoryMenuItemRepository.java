@@ -2,7 +2,6 @@ package com.midnightmunchies.technicalservices.ord.repository;
 
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.repository.MenuItemRepository;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Map;
@@ -11,7 +10,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Repository
 public class InMemoryMenuItemRepository implements MenuItemRepository {
 
 	private final Map<UUID, MenuItem> menuItems = new ConcurrentHashMap<>();
@@ -26,6 +24,11 @@ public class InMemoryMenuItemRepository implements MenuItemRepository {
 		Objects.requireNonNull(menuItem, "menuItem must not be null");
 		menuItems.put(menuItem.getId(), menuItem);
 		return menuItem;
+	}
+
+	@Override
+	public boolean deleteById(UUID id) {
+		return menuItems.remove(Objects.requireNonNull(id, "id must not be null")) != null;
 	}
 
 	@Override
