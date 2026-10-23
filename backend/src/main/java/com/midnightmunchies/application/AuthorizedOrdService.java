@@ -1,6 +1,7 @@
 package com.midnightmunchies.application;
 
 import com.midnightmunchies.domain.ord.MenuItem;
+import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
@@ -10,6 +11,7 @@ import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,10 +31,40 @@ public class AuthorizedOrdService implements OrdService {
     }
 
     @Override
+    public List<Restaurant> browseRestaurants(HttpSession session) {
+        requireAuthenticated(session);
+        return realService.browseRestaurants(session);
+    }
+
+    @Override
     public List<MenuItem> browseMenu(UUID restaurantId, HttpSession session) {
         requireAuthenticated(session);
         requireRestaurant(restaurantId);
         return realService.browseMenu(restaurantId, session);
+    }
+
+    @Override
+    public MenuItem addMenuItem(UUID restaurantId, String name, BigDecimal price, HttpSession session) {
+        requireRestaurantOwner(restaurantId, session);
+        return realService.addMenuItem(restaurantId, name, price, session);
+    }
+
+    @Override
+    public MenuItem editMenuItem(UUID restaurantId, UUID menuItemId, String name, BigDecimal price, HttpSession session) {
+        requireRestaurantOwner(restaurantId, session);
+        return realService.editMenuItem(restaurantId, menuItemId, name, price, session);
+    }
+
+    @Override
+    public void removeMenuItem(UUID restaurantId, UUID menuItemId, HttpSession session) {
+        requireRestaurantOwner(restaurantId, session);
+        realService.removeMenuItem(restaurantId, menuItemId, session);
+    }
+
+    @Override
+    public MenuItem changeMenuItemAvailability(UUID restaurantId, UUID menuItemId, MenuItemStatus status, HttpSession session) {
+        requireRestaurantOwner(restaurantId, session);
+        return realService.changeMenuItemAvailability(restaurantId, menuItemId, status, session);
     }
 
     @Override
@@ -77,9 +109,22 @@ public class AuthorizedOrdService implements OrdService {
         return user;
     }
 
-    private void requireRestaurant(UUID restaurantId) {
-        if (restaurantId == null || restaurantRepository.findById(restaurantId).isEmpty()) {
+    private Restaurant requireRestaurant(UUID restaurantId) {
+        if (restaurantId == null) {
             throw new IllegalArgumentException("Restaurant does not exist");
+        }
+        return restaurantRepository.findById(restaurantId)
+                .orElseThrow(() -> new IllegalArgumentException("Restaurant does not exist"));
+    }
+
+    private void requireRestaurantOwner(UUID restaurantId, HttpSession session) {
+        UserAccount user = requireAuthenticated(session);
+        if (user.role() != UserRole.RESTAURANT_STAFF) {
+            throw new AuthorizationException("Only restaurant staff can manage menus");
+        }
+        Restaurant restaurant = requireRestaurant(restaurantId);
+        if (!userId(user).equals(restaurant.getOwnerId())) {
+            throw new AuthorizationException("Staff can only manage their own restaurant's menu");
         }
     }
 

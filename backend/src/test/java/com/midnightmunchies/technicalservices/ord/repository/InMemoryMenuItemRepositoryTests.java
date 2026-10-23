@@ -43,21 +43,23 @@ class InMemoryMenuItemRepositoryTests {
 	}
 
 	@Test
-	void replacingMenuItemKeepsCapturedOrderPriceAndQuerySnapshots() {
+	void replacingMenuItemKeepsCapturedOrderDetailsAndQuerySnapshots() {
 		UUID itemId = UUID.randomUUID();
 		UUID restaurantId = UUID.randomUUID();
 		MenuItem original = item(itemId, restaurantId, "12.35", MenuItemStatus.AVAILABLE);
 		repository.save(original);
-		OrderLine line = new OrderLine(itemId, 2, original.getPrice());
+		OrderLine line = new OrderLine(itemId, original.getName(), 2, original.getPrice());
 		List<MenuItem> allSnapshot = repository.findAll();
 		List<MenuItem> menuSnapshot = repository.findByRestaurantId(restaurantId);
-		MenuItem replacement = item(itemId, restaurantId, "15.00", MenuItemStatus.SOLD_OUT);
+		MenuItem replacement = new MenuItem(itemId, restaurantId, "Loaded Poutine",
+				new BigDecimal("15.00"), MenuItemStatus.SOLD_OUT);
 		repository.save(replacement);
 
 		assertSame(replacement, repository.findById(itemId).orElseThrow());
 		assertEquals(List.of(replacement), repository.findByRestaurantId(restaurantId));
 		assertEquals(1, repository.findAll().size());
 		assertEquals(new BigDecimal("12.35"), line.getUnitPrice());
+		assertEquals("Poutine", line.getMenuItemName());
 		assertEquals(List.of(original), allSnapshot);
 		assertEquals(List.of(original), menuSnapshot);
 		assertThrows(UnsupportedOperationException.class, allSnapshot::clear);
@@ -65,10 +67,38 @@ class InMemoryMenuItemRepositoryTests {
 	}
 
 	@Test
+	void deletingMenuItemRemovesItFromCurrentLookupsAndMenusWithoutAffectingOtherItems() {
+		UUID restaurantId = UUID.randomUUID();
+		MenuItem removed = item(UUID.randomUUID(), restaurantId, "12.35", MenuItemStatus.AVAILABLE);
+		MenuItem retained = item(UUID.randomUUID(), restaurantId, "5.00", MenuItemStatus.SOLD_OUT);
+		MenuItem other = item(UUID.randomUUID(), UUID.randomUUID(), "8.00", MenuItemStatus.AVAILABLE);
+		repository.save(removed);
+		repository.save(retained);
+		repository.save(other);
+		List<MenuItem> previousMenu = repository.findByRestaurantId(restaurantId);
+
+		assertTrue(repository.deleteById(removed.getId()));
+
+		assertTrue(repository.findById(removed.getId()).isEmpty());
+		assertEquals(List.of(retained), repository.findByRestaurantId(restaurantId));
+		assertEquals(List.of(other), repository.findByRestaurantId(other.getRestaurantId()));
+		assertEquals(Set.of(retained, other), Set.copyOf(repository.findAll()));
+		assertEquals(Set.of(removed, retained), Set.copyOf(previousMenu));
+		assertFalse(repository.deleteById(removed.getId()));
+	}
+
+	@Test
+	void deletingMissingMenuItemReturnsFalse() {
+		assertFalse(repository.deleteById(UUID.randomUUID()));
+		assertTrue(repository.findAll().isEmpty());
+	}
+
+	@Test
 	void rejectsNullArguments() {
 		assertThrows(NullPointerException.class, () -> repository.save(null));
 		assertThrows(NullPointerException.class, () -> repository.findById(null));
 		assertThrows(NullPointerException.class, () -> repository.findByRestaurantId(null));
+		assertThrows(NullPointerException.class, () -> repository.deleteById(null));
 	}
 
 	private MenuItem item(UUID id, UUID restaurantId, String price, MenuItemStatus status) {
