@@ -40,6 +40,21 @@ export const api = {
   logout: () => request("/api/auth/logout", { method: "POST" }),
   restaurants: () => request("/api/ord/restaurants"),
   menu: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/menu`),
+  addMenuItem: (restaurantId, name, price) => request(`/api/ord/restaurants/${restaurantId}/menu`, {
+    method: "POST",
+    body: JSON.stringify({ name, price })
+  }),
+  editMenuItem: (restaurantId, menuItemId, name, price) => request(`/api/ord/restaurants/${restaurantId}/menu/${menuItemId}`, {
+    method: "PUT",
+    body: JSON.stringify({ name, price })
+  }),
+  removeMenuItem: (restaurantId, menuItemId) => request(`/api/ord/restaurants/${restaurantId}/menu/${menuItemId}`, {
+    method: "DELETE"
+  }),
+  changeMenuItemAvailability: (restaurantId, menuItemId, status) => request(`/api/ord/restaurants/${restaurantId}/menu/${menuItemId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status })
+  }),
   placeOrder: (restaurantId, lines) => request(`/api/ord/restaurants/${restaurantId}/orders`, {
     method: "POST",
     body: JSON.stringify({ lines })

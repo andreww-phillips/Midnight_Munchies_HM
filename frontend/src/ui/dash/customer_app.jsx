@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../../api";
+import RestaurantMenu from "./menu_page/menu_page";
 import "./customer_app.css";
-
-export const formatPrice = (price) => `$${Number(price).toFixed(2)}`;
 
 function ErrorMessage({ message }) {
   return message ? <p className="error-message" role="alert">{message}</p> : null;
@@ -137,8 +136,6 @@ function AuthScreen({ onAuthenticated }) {
 function CustomerDashboard({ user, onLogout }) {
   const [restaurants, setRestaurants] = useState([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
-  const [menu, setMenu] = useState([]);
-  const [cart, setCart] = useState({});
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -167,44 +164,9 @@ function CustomerDashboard({ user, onLogout }) {
     loadOrders();
   }, []);
 
-  const chooseRestaurant = async (restaurant) => {
+  const chooseRestaurant = (restaurant) => {
     setError("");
     setSelectedRestaurant(restaurant);
-    setCart({});
-    try {
-      setMenu(await api.menu(restaurant.id));
-    } catch (loadError) {
-      setError(loadError.message);
-    }
-  };
-
-  const updateQuantity = (item, quantity) => {
-    setCart((previous) => {
-      const next = { ...previous };
-      if (quantity < 1) delete next[item.id];
-      else next[item.id] = quantity;
-      return next;
-    });
-  };
-
-  const cartLines = useMemo(
-    () => menu.filter((item) => cart[item.id]).map((item) => ({ item, quantity: cart[item.id] })),
-    [cart, menu]
-  );
-  const total = cartLines.reduce((sum, line) => sum + Number(line.item.price) * line.quantity, 0);
-
-  const placeOrder = async () => {
-    setError("");
-    try {
-      const order = await api.placeOrder(selectedRestaurant.id, cartLines.map(({ item, quantity }) => ({
-        menuItemId: item.id,
-        quantity
-      })));
-      setOrders((previous) => [order, ...previous]);
-      setCart({});
-    } catch (orderError) {
-      setError(orderError.message);
-    }
   };
 
   return (
@@ -212,7 +174,7 @@ function CustomerDashboard({ user, onLogout }) {
       <header className="topbar">
         <div>
           <p className="eyebrow">MIDNIGHT MUNCHIES</p>
-          <h1>What are you craving, {user.username}?</h1>
+          <h1>{user.role === "RESTAURANT_STAFF" ? "Manage your restaurant menu" : `What are you craving, ${user.username}?`}</h1>
         </div>
         <button className="secondary-button" type="button" onClick={onLogout}>Log out</button>
       </header>
@@ -231,22 +193,12 @@ function CustomerDashboard({ user, onLogout }) {
         {!loading && restaurants.length === 0 && <p className="muted">No restaurants are available right now.</p>}
       </section>
       {selectedRestaurant && (
-        <section className="menu-section">
-          <div className="section-heading"><h2>{selectedRestaurant.name} menu</h2><span className="muted">{formatPrice(total)} in cart</span></div>
-          <div className="menu-list">
-            {menu.map((item) => (
-              <div className="menu-item" key={item.id}>
-                <div><strong>{item.name}</strong><p className="muted">{formatPrice(item.price)}</p></div>
-                <div className="quantity-control">
-                  <button type="button" onClick={() => updateQuantity(item, (cart[item.id] || 0) - 1)}>-</button>
-                  <span>{cart[item.id] || 0}</span>
-                  <button type="button" onClick={() => updateQuantity(item, (cart[item.id] || 0) + 1)}>+</button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button className="primary-button order-button" disabled={!cartLines.length} onClick={placeOrder}>Place order · {formatPrice(total)}</button>
-        </section>
+        <RestaurantMenu
+          key={selectedRestaurant.id}
+          restaurant={selectedRestaurant}
+          user={user}
+          onOrderPlaced={(order) => setOrders((previous) => [order, ...previous])}
+        />
       )}
       <section>
         <div className="section-heading"><h2>Your orders</h2><button className="link-button" type="button" onClick={loadOrders}>Refresh status</button></div>

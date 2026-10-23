@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPrice } from "./customer_app";
+import { formatPrice } from "./menu_page/menu_format";
 
 describe("customer ordering display", () => {
   it("formats menu prices as currency", () => {
