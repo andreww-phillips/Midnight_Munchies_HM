@@ -29,6 +29,12 @@ public class AuthorizedOrdService implements OrdService {
     }
 
     @Override
+    public List<Restaurant> browseRestaurants(HttpSession session) {
+        requireAuthenticated(session);
+        return realService.browseRestaurants(session);
+    }
+
+    @Override
     public List<MenuItem> browseMenu(UUID restaurantId, HttpSession session) {
         requireAuthenticated(session);
         requireRestaurant(restaurantId);
