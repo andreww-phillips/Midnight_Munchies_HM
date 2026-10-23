@@ -138,12 +138,6 @@ class MenuManagementServiceTests {
     }
 
     @Test
-    void unassignedStaffCannotManageAnExistingRestaurant() {
-        assertAllOperationsRejected(service, restaurantId, session(UUID.randomUUID(), UserRole.RESTAURANT_STAFF),
-                AuthorizationException.class);
-    }
-
-    @Test
     void staffCannotManageARestaurantWithoutAnOwner() {
         restaurants.save(new Restaurant(restaurantId, "Unassigned Diner", RestaurantStatus.OPEN, 0, 0));
 

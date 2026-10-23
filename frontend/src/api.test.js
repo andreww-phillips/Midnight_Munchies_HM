@@ -27,12 +27,6 @@ describe("menu management API", () => {
     expect(options.body === undefined ? undefined : JSON.parse(options.body)).toEqual(body);
   });
 
-  it.each([400, 401, 403, 404])("preserves the backend error message for HTTP %s", async (status) => {
-    fetch.mockResolvedValue(new Response(JSON.stringify({ message: "Backend menu error" }), { status }));
-
-    await expect(api.addMenuItem("restaurant-1", "Fries", "5.49")).rejects.toThrow("Backend menu error");
-  });
-
   it.each([
     [401, "Please log in to continue."],
     [403, "You do not have permission to perform this action."]

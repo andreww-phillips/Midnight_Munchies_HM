@@ -236,27 +236,45 @@ describe('shared command console', () => {
 
 describe('command logging integration', () => {
   it.each([
-    ['Accept', 'acceptOrder', 'PLACED', 'ACCEPTED', 'Accept order'],
-    ['Reject', 'rejectOrder', 'PLACED', 'REJECTED', 'Reject order'],
-    ['Start next preparation', 'startNextPreparation', 'ACCEPTED', 'PREPARING', 'Start preparation'],
-    ['Mark Ready', 'markOrderReady', 'PREPARING', 'READY', 'Mark order ready']
-  ])('logs %s exactly once after the backend confirms it', async (label, method, initial, status, action) => {
-    const request = deferred();
-    api.orders.mockResolvedValue([order(initial)]);
-    api.preparationQueue.mockResolvedValue(initial === 'ACCEPTED' ? [order(initial)] : []);
+    ['Accept', 'acceptOrder', 'ACCEPTED', 'Accept order'],
+    ['Reject', 'rejectOrder', 'REJECTED', 'Reject order'],
+    ['Start next preparation', 'startNextPreparation', 'PREPARING', 'Start preparation'],
+    ['Mark Ready', 'markOrderReady', 'READY', 'Mark order ready']
+  ])('logs %s once and blocks duplicates through the command and refresh', async (label, method, status, action) => {
+    const request = deferred(), refresh = deferred();
+    const incoming = order(), cooking = { ...order('PREPARING'), id: 'cooking' };
+    const waiting = { ...order('ACCEPTED'), id: 'waiting' };
+    api.orders.mockResolvedValue([incoming, cooking, waiting]);
+    api.preparationQueue.mockResolvedValue([waiting]);
     api[method].mockReturnValue(request.promise);
     await renderLogged(<RestaurantDashboard restaurant={restaurant} user={staff} />);
+    api.orders.mockReturnValueOnce(refresh.promise);
     if (label === 'Reject') await change(container.querySelector('input'), 'Kitchen closed');
     const control = button(label);
-    await act(async () => { control.click(); control.click(); });
+    const rejectionForm = container.querySelector('form');
+    await act(async () => {
+      if (label === 'Reject') {
+        rejectionForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        rejectionForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      } else { control.click(); control.click(); }
+    });
     expect(entries()).toHaveLength(0);
     expect(api[method]).toHaveBeenCalledTimes(1);
-    api.orders.mockResolvedValue([order(status)]);
-    api.preparationQueue.mockResolvedValue(status === 'ACCEPTED' ? [order(status)] : []);
-    await act(async () => request.resolve(order(status)));
+    for (const element of container.querySelectorAll('button, input')) expect(element.disabled).toBe(true);
+    expect(container.querySelector('[aria-busy]').getAttribute('aria-busy')).toBe('true');
+    expect([...container.querySelectorAll('[role="status"]')].some((element) => element.textContent.endsWith('...'))).toBe(true);
+    const updated = { ...order(status), id: method === 'startNextPreparation' ? waiting.id : method === 'markOrderReady' ? cooking.id : incoming.id };
+    api.preparationQueue.mockResolvedValue(status === 'ACCEPTED' ? [updated] : []);
+    await act(async () => request.resolve(updated));
+    expect(button('Refresh orders').disabled).toBe(true);
     expect(entries()).toHaveLength(1);
     expect(output().textContent).toContain(`Success · ${action}`);
     expect(output().textContent).toContain(`Status: ${status}`);
+    await act(async () => refresh.resolve([updated]));
+    expect(button('Refresh orders').disabled).toBe(false);
+    expect(container.querySelector('[aria-busy]').getAttribute('aria-busy')).toBe('false');
+    expect(api[method]).toHaveBeenCalledTimes(1);
+    expect(entries()).toHaveLength(1);
     expect(api.orderEvents).not.toHaveBeenCalled();
   });
 
@@ -270,6 +288,11 @@ describe('command logging integration', () => {
     expect(output().textContent).toContain('Backend order error');
     expect(output().textContent).toContain(`HTTP ${status}`);
     expect(output().textContent).not.toContain('Success');
+    expect(container.querySelector('[role="alert"]').textContent).toBe('Backend order error');
+    expect(container.querySelector('.dashboard-success')).toBeNull();
+    expect(container.querySelector('[aria-label="Last updated order"]')).toBeNull();
+    expect(button('Accept').disabled).toBe(false);
+    expect(api.acceptOrder).toHaveBeenCalledTimes(1);
   });
 
   it('records mutation success and follow-up refresh failure separately', async () => {

@@ -34,7 +34,6 @@ function RegistrationScreen() {
     work_id: "",
     address_longitude: 0.0,       
     address_latitude: 0.0,  
-    status: "",
     menu: null, 
     logo: null
   });
@@ -154,7 +153,6 @@ function RegistrationScreen() {
       work_id: "",
       address_longitude: "",
       address_latitude: "",
-      status: "",
       menu: null,
       logo: null,
     });

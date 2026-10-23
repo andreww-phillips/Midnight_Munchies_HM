@@ -17,12 +17,9 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .secondary-button { background: var(--accent-bg); color: var(--accent); }
 .link-button { background: none; color: var(--accent); padding: 8px 0; }
 .error-message { padding: 12px 16px; border-radius: 10px; background: #fee2e2; color: #991b1b; }
-.restaurant-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
 .restaurant-card { display: grid; gap: 6px; text-align: left; border: 1px solid var(--border); background: var(--surface); }
-.restaurant-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-border); }
-.restaurant-icon { font-size: 30px; }
 .menu-section { padding: 24px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); }
-.menu-list, .orders-list { display: grid; gap: 10px; }
+.menu-list { display: grid; gap: 10px; }
 .menu-item, .order-card { padding: 16px 0; border-bottom: 1px solid var(--border); }
 .quantity-control { display: flex; align-items: center; gap: 12px; }
 .quantity-control button { padding: 4px 10px; background: var(--accent-bg); color: var(--accent); }
