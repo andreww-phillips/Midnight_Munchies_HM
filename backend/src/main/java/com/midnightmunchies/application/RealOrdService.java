@@ -35,6 +35,11 @@ public class RealOrdService implements OrdService {
     }
 
     @Override
+    public List<Restaurant> browseRestaurants(HttpSession session) {
+        return restaurantRepository.findAll();
+    }
+
+    @Override
     public List<MenuItem> browseMenu(UUID restaurantId, HttpSession session) {
         return menuItemRepository.findByRestaurantId(restaurantId);
     }

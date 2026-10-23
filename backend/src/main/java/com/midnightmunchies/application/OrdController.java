@@ -2,6 +2,7 @@ package com.midnightmunchies.application;
 
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.Order;
+import com.midnightmunchies.domain.ord.Restaurant;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,13 +27,18 @@ public class OrdController {
         this.authorizedService = authorizedService;
     }
 
+    @GetMapping("/restaurants")
+    public ResponseEntity<?> restaurants(HttpSession session) {
+        return execute(() -> authorizedService.browseRestaurants(session));
+    }
+
     @GetMapping("/restaurants/{restaurantId}/menu")
-    public ResponseEntity<List<MenuItem>> menu(@PathVariable UUID restaurantId, HttpSession session) {
+    public ResponseEntity<?> menu(@PathVariable UUID restaurantId, HttpSession session) {
         return execute(() -> authorizedService.browseMenu(restaurantId, session));
     }
 
     @PostMapping("/restaurants/{restaurantId}/orders")
-    public ResponseEntity<Order> placeOrder(
+    public ResponseEntity<?> placeOrder(
             @PathVariable UUID restaurantId,
             @RequestBody PlaceOrderRequest request,
             HttpSession session
@@ -41,19 +47,22 @@ public class OrdController {
     }
 
     @GetMapping("/orders")
-    public ResponseEntity<List<Order>> orders(HttpSession session) {
+    public ResponseEntity<?> orders(HttpSession session) {
         return execute(() -> authorizedService.viewOrders(session));
     }
 
-    private <T> ResponseEntity<T> execute(AuthorizedOperation<T> operation) {
+    private <T> ResponseEntity<?> execute(AuthorizedOperation<T> operation) {
         try {
             return ResponseEntity.ok(operation.run());
         } catch (AuthenticationRequiredException exception) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ErrorResponse(exception.getMessage()));
         } catch (AuthorizationException exception) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ErrorResponse(exception.getMessage()));
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest()
+                    .body(new ErrorResponse(exception.getMessage()));
         }
     }
 
@@ -63,5 +72,8 @@ public class OrdController {
     }
 
     public record PlaceOrderRequest(List<OrdService.OrderLineRequest> lines) {
+    }
+
+    public record ErrorResponse(String message) {
     }
 }
