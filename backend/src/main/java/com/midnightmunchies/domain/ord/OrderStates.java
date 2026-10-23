@@ -13,6 +13,18 @@ final class OrderStates {
 	private OrderStates() {
 	}
 
+	static OrderState of(OrderStatus status) {
+		return switch (status) {
+			case PLACED -> PLACED;
+			case ACCEPTED -> ACCEPTED;
+			case PREPARING -> PREPARING;
+			case READY -> READY;
+			case REJECTED -> REJECTED;
+			case CANCELLED -> CANCELLED;
+			default -> throw new IllegalArgumentException("Orders cannot be restored with status " + status);
+		};
+	}
+
 	private static final class Placed extends AbstractOrderState {
 		@Override
 		public OrderStatus status() {
