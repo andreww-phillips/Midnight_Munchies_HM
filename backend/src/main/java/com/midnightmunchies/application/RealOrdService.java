@@ -5,15 +5,18 @@ import com.midnightmunchies.domain.ord.IllegalOrderTransitionException;
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
+import com.midnightmunchies.domain.ord.OrderEvent;
 import com.midnightmunchies.domain.ord.OrderLine;
 import com.midnightmunchies.domain.ord.OrderStatus;
 import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.RestaurantStatus;
 import com.midnightmunchies.domain.ord.repository.MenuItemRepository;
+import com.midnightmunchies.domain.ord.repository.OrderEventLog;
 import com.midnightmunchies.domain.ord.repository.OrderRepository;
 import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
+import com.midnightmunchies.technicalservices.ord.repository.InMemoryOrderEventLog;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -31,6 +34,7 @@ public class RealOrdService implements OrdService {
     private final MenuItemRepository menuItemRepository;
     private final OrderRepository orderRepository;
     private final PreparationQueue preparationQueue;
+    private final OrderEventLog eventLog;
 
     public RealOrdService(
             RestaurantRepository restaurantRepository,
@@ -40,13 +44,24 @@ public class RealOrdService implements OrdService {
         this(restaurantRepository, menuItemRepository, orderRepository, new PreparationQueue(orderRepository));
     }
 
-    @Autowired
     public RealOrdService(
             RestaurantRepository restaurantRepository,
             MenuItemRepository menuItemRepository,
             OrderRepository orderRepository,
             PreparationQueue preparationQueue
     ) {
+        this(restaurantRepository, menuItemRepository, orderRepository, preparationQueue, new InMemoryOrderEventLog());
+    }
+
+    @Autowired
+    public RealOrdService(
+            RestaurantRepository restaurantRepository,
+            MenuItemRepository menuItemRepository,
+            OrderRepository orderRepository,
+            PreparationQueue preparationQueue,
+            OrderEventLog eventLog
+    ) {
+        this.eventLog = eventLog;
         this.restaurantRepository = restaurantRepository;
         this.menuItemRepository = menuItemRepository;
         this.orderRepository = orderRepository;
@@ -158,6 +173,24 @@ public class RealOrdService implements OrdService {
             }
         }
         return preparationQueue.cancel(order, actor);
+    }
+
+    @Override
+    public List<OrderEvent> viewOrderEvents(UUID orderId, HttpSession session) {
+        Order order = requireOrder(orderId);
+        Actor actor = currentActor(session);
+        boolean allowed = switch (actor.role()) {
+            case PLATFORM_OPERATOR -> true;
+            case CUSTOMER -> order.getCustomerId().equals(actor.userId());
+            case RESTAURANT_STAFF -> restaurantRepository.findById(order.getRestaurantId())
+                    .map(restaurant -> actor.userId().equals(restaurant.getOwnerId()))
+                    .orElse(false);
+            default -> false;
+        };
+        if (!allowed) {
+            throw new OrderNotFoundException("Order does not exist");
+        }
+        return eventLog.findByOrderId(orderId);
     }
 
     private UserAccount currentUser(HttpSession session) {
