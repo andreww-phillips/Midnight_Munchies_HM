@@ -75,8 +75,8 @@ export default function RestaurantMenu({ restaurant, onBack }) {
                   : item.item_description}
               </p>
             )}
+            <p>Status: {item.availability ? "Available" : "Unavailable"}</p>
             {item.item_cost != null && <p>${item.item_cost}</p>}
-            <p>{item.availability ? "Available" : "Unavailable"}</p>
           </article>
         ))}
       </section>
