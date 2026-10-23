@@ -29,11 +29,6 @@ public class InMemoryMenuItemRepository implements MenuItemRepository {
 	}
 
 	@Override
-	public boolean deleteById(UUID id) {
-		return menuItems.remove(Objects.requireNonNull(id, "id must not be null")) != null;
-	}
-
-	@Override
 	public List<MenuItem> findAll() {
 		return List.copyOf(menuItems.values());
 	}

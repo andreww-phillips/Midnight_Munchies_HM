@@ -1,27 +1,18 @@
 package com.midnightmunchies.application;
 
 import com.midnightmunchies.domain.ord.MenuItem;
-import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
-import com.midnightmunchies.domain.ord.Restaurant;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,61 +26,13 @@ public class OrdController {
         this.authorizedService = authorizedService;
     }
 
-    @GetMapping("/restaurants")
-    public ResponseEntity<?> restaurants(HttpSession session) {
-        return execute(() -> authorizedService.browseRestaurants(session));
-    }
-
     @GetMapping("/restaurants/{restaurantId}/menu")
-    public ResponseEntity<?> menu(@PathVariable UUID restaurantId, HttpSession session) {
+    public ResponseEntity<List<MenuItem>> menu(@PathVariable UUID restaurantId, HttpSession session) {
         return execute(() -> authorizedService.browseMenu(restaurantId, session));
     }
 
-    @PostMapping("/restaurants/{restaurantId}/menu")
-    public ResponseEntity<?> addMenuItem(
-            @PathVariable UUID restaurantId,
-            @RequestBody MenuItemRequest request,
-            HttpSession session
-    ) {
-        return execute(() -> authorizedService.addMenuItem(restaurantId, request.name(), request.price(), session),
-                HttpStatus.CREATED);
-    }
-
-    @PutMapping("/restaurants/{restaurantId}/menu/{menuItemId}")
-    public ResponseEntity<?> editMenuItem(
-            @PathVariable UUID restaurantId,
-            @PathVariable UUID menuItemId,
-            @RequestBody MenuItemRequest request,
-            HttpSession session
-    ) {
-        return execute(() -> authorizedService.editMenuItem(restaurantId, menuItemId, request.name(), request.price(), session));
-    }
-
-    @DeleteMapping("/restaurants/{restaurantId}/menu/{menuItemId}")
-    public ResponseEntity<?> removeMenuItem(
-            @PathVariable UUID restaurantId,
-            @PathVariable UUID menuItemId,
-            HttpSession session
-    ) {
-        return execute(() -> {
-            authorizedService.removeMenuItem(restaurantId, menuItemId, session);
-            return null;
-        }, HttpStatus.NO_CONTENT);
-    }
-
-    @PatchMapping("/restaurants/{restaurantId}/menu/{menuItemId}/status")
-    public ResponseEntity<?> changeMenuItemAvailability(
-            @PathVariable UUID restaurantId,
-            @PathVariable UUID menuItemId,
-            @RequestBody MenuItemStatusRequest request,
-            HttpSession session
-    ) {
-        return execute(() -> authorizedService.changeMenuItemAvailability(
-                restaurantId, menuItemId, request.toStatus(), session));
-    }
-
     @PostMapping("/restaurants/{restaurantId}/orders")
-    public ResponseEntity<?> placeOrder(
+    public ResponseEntity<Order> placeOrder(
             @PathVariable UUID restaurantId,
             @RequestBody PlaceOrderRequest request,
             HttpSession session
@@ -98,40 +41,20 @@ public class OrdController {
     }
 
     @GetMapping("/orders")
-    public ResponseEntity<?> orders(HttpSession session) {
+    public ResponseEntity<List<Order>> orders(HttpSession session) {
         return execute(() -> authorizedService.viewOrders(session));
     }
 
-    private <T> ResponseEntity<?> execute(AuthorizedOperation<T> operation) {
-        return execute(operation, HttpStatus.OK);
-    }
-
-    private <T> ResponseEntity<?> execute(AuthorizedOperation<T> operation, HttpStatus successStatus) {
+    private <T> ResponseEntity<T> execute(AuthorizedOperation<T> operation) {
         try {
-            return ResponseEntity.status(successStatus).body(operation.run());
+            return ResponseEntity.ok(operation.run());
         } catch (AuthenticationRequiredException exception) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ErrorResponse(exception.getMessage()));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         } catch (AuthorizationException exception) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new ErrorResponse(exception.getMessage()));
-        } catch (MenuItemNotFoundException exception) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(new ErrorResponse(exception.getMessage()));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest()
-                    .body(new ErrorResponse(exception.getMessage()));
+            return ResponseEntity.badRequest().build();
         }
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> invalidRequestBody() {
-        return ResponseEntity.badRequest().body(new ErrorResponse("Request body is missing or malformed"));
-    }
-
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ErrorResponse> invalidIdentifier() {
-        return ResponseEntity.badRequest().body(new ErrorResponse("Restaurant and menu item IDs must be valid UUIDs"));
     }
 
     @FunctionalInterface
@@ -140,24 +63,5 @@ public class OrdController {
     }
 
     public record PlaceOrderRequest(List<OrdService.OrderLineRequest> lines) {
-    }
-
-    public record MenuItemRequest(String name, BigDecimal price) {
-    }
-
-    public record MenuItemStatusRequest(String status) {
-        public MenuItemStatus toStatus() {
-            if (status != null) {
-                try {
-                    return MenuItemStatus.valueOf(status);
-                } catch (IllegalArgumentException exception) {
-                    // Only the enum names are accepted, including when JSON scalars are coerced to strings.
-                }
-            }
-            throw new IllegalArgumentException("Menu item status must be AVAILABLE or SOLD_OUT");
-        }
-    }
-
-    public record ErrorResponse(String message) {
     }
 }

@@ -7,6 +7,7 @@ const API_URL = "http://localhost:8080/api/auth";
 export default function RegistrationPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [user, setUser] = useState(null);
+  const [showRestaurantLibrary, setShowRestaurantLibrary] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -95,28 +96,6 @@ export default function RegistrationPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!isLogin) {
-      if (!formData.role) {
-        setError("Please select a role.");
-        return;
-      }
-      if (formData.role === "customer" &&
-        (!formData.first_name || !formData.last_name ||
-          formData.address_longitude === "" || formData.address_latitude === "")) {
-        setError("Please complete all customer profile fields.");
-        return;
-      }
-      if (formData.role === "courier" &&
-        (!formData.first_name || !formData.last_name || !formData.work_id)) {
-        setError("Please complete all courier profile fields.");
-        return;
-      }
-      if (formData.role === "restaurant" &&
-        (!formData.restaurant_name || !formData.logo)) {
-        setError("Please provide the restaurant name and logo.");
-        return;
-      }
-    }
     setIsSubmitting(true);
     try {
       const response = await fetch(`${API_URL}/${isLogin ? "login" : "register"}`, {
@@ -215,6 +194,7 @@ export default function RegistrationPage() {
   const handleLogout = async () => {
     await fetch(`${API_URL}/logout`, { method: "POST", credentials: "include" });
     setUser(null);
+    setShowRestaurantLibrary(false);
     setError("");
     setFormData({
       role: "",
@@ -238,7 +218,27 @@ export default function RegistrationPage() {
         <h3>Welcome, {user.username}</h3>
         <p>Role: {user.role}</p>
         <button type="button" onClick={handleLogout}>Log out</button>
-        <RestaurantList role={user.role} />
+        {!showRestaurantLibrary && (
+          <button
+            type="button"
+            onClick={() => setShowRestaurantLibrary(true)}
+          >
+            Restaurant Library
+          </button>
+        )}
+        {showRestaurantLibrary ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowRestaurantLibrary(false)}
+            >
+              Back
+            </button>
+            <RestaurantList role={user.role} />
+          </>
+        ) : (
+          <RestaurantList role={user.role} />
+        )}
       </div>
     );
   }
@@ -249,10 +249,9 @@ export default function RegistrationPage() {
       <nav></nav>
       <main>
         <h3>{isLogin ? "Log in" : "Register"}</h3>
-        <form onSubmit={handleSubmit}>
         {!isLogin && <section id="role-selection-container">
-          <label htmlFor="role-selection">Select Your Role:</label>
-          <select id="role-selection" name="role" value ={formData.role} onChange={handleChange} required>
+          <label>Select Your Role:</label>
+          <select id="role-selection" name="role" value ={formData.role} onChange={handleChange}>
               <option value="">Please select a role</option>
               <option value="customer">Customer</option>
               <option value="courier">Courier</option>
@@ -273,19 +272,19 @@ export default function RegistrationPage() {
             <>
               <div id="input-field" name="first_name">
                 <label htmlFor="first_name">First Name:</label>
-                <input type="text" placeholder="First Name" name="first_name" value={formData.first_name} onChange={handleChange} required />
+                <input type="text" placeholder="First Name" name="first_name" value={formData.first_name} onChange={handleChange} />
               </div>
               <div id="input-field" name="last_name">
                 <label htmlFor="last_name">Last Name:</label>
-                <input type="text" placeholder="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} required />
+                <input type="text" placeholder="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} />
               </div>
               <div id="input-field" name="address_longitude">
                 <label htmlFor="address_longitude">Address Longitude:</label>
-                <input type="number" placeholder="Address Longitude" name="address_longitude" value={formData.address_longitude} onChange={handleChange} required />
+                <input type="number" placeholder="Address Longitude" name="address_longitude" value={formData.address_longitude} onChange={handleChange} />
               </div>
               <div id="input-field" name="address_latitude">
                 <label htmlFor="address_latitude">Address Latitude:</label>
-                <input type="number" placeholder="Address Latitude" name="address_latitude" value={formData.address_latitude} onChange={handleChange} required />
+                <input type="number" placeholder="Address Latitude" name="address_latitude" value={formData.address_latitude} onChange={handleChange} />
               </div>
             </>
             )}
@@ -293,7 +292,7 @@ export default function RegistrationPage() {
             <>
               <div id="input-field" name="restaurant_name">
                 <label htmlFor="restaurant_name">Restaurant Name:</label>
-                <input type="text" placeholder="Restaurant Name" name="restaurant_name" value={formData.restaurant_name} onChange={handleChange} required />
+                <input type="text" placeholder="Restaurant Name" name="restaurant_name" value={formData.restaurant_name} onChange={handleChange} />
               </div>
               <div id="input-field" name="menu">
                 <label htmlFor="menu">Menu:</label>
@@ -301,7 +300,7 @@ export default function RegistrationPage() {
               </div>
               <div id="input-field" name="logo">
                 <label htmlFor="logo">Logo:</label>
-                <input type="file" accept=".jpg,.jpeg,.png,.gif,.pdf" name="logo" onChange={handleFileChange} required />
+                <input type="file" accept=".jpg,.jpeg,.png,.gif,.pdf" name="logo" onChange={handleFileChange} />
               </div>
             </>
           )}
@@ -309,23 +308,22 @@ export default function RegistrationPage() {
             <>
               <div id="input-field" name="first_name">
                 <label htmlFor="first_name">First Name:</label>
-                <input type="text" placeholder="First Name" name="first_name" value={formData.first_name} onChange={handleChange} required />
+                <input type="text" placeholder="First Name" name="first_name" value={formData.first_name} onChange={handleChange} />
               </div>
               <div id="input-field" name="last_name">
                 <label htmlFor="last_name">Last Name:</label>
-                <input type="text" placeholder="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} required />
+                <input type="text" placeholder="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} />
               </div>
             </>
           )}
           {error && <p role="alert">{error}</p>}
-          <button type="submit" disabled={isSubmitting}>
+          <button type="submit" onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? "Please wait..." : isLogin ? "Log in" : "Register"}
           </button>
           <button type="button" onClick={() => { setIsLogin(!isLogin); setError(""); }}>
             {isLogin ? "Create an account" : "Use an existing account"}
           </button>
-        </section>
-        </form>
+        </section> 
       </main>
       <footer>
         <p>&copy; 2023 Midnight Munchies. All rights reserved.</p>

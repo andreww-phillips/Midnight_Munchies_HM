@@ -28,8 +28,7 @@ public class AuthController {
     public ResponseEntity<UserResponse> login(@RequestBody LoginRequest request, HttpSession session) {
         UserAccount account = authService.authenticate(request.username(), request.password());
         if (account == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new UserResponse(null, null, null, "Username or password is incorrect"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         session.setAttribute(SESSION_USER, account);
         return ResponseEntity.ok(UserResponse.from(account));
@@ -42,11 +41,9 @@ public class AuthController {
             session.setAttribute(SESSION_USER, account);
             return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(account));
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest()
-                    .body(new UserResponse(null, null, null, exception.getMessage()));
+            return ResponseEntity.badRequest().build();
         } catch (IllegalStateException exception) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(new UserResponse(null, null, null, exception.getMessage()));
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
     }
 
@@ -71,9 +68,9 @@ public class AuthController {
     public record RegisterRequest(String username, String password, UserRole role) {
     }
 
-    public record UserResponse(String id, String username, UserRole role, String message) {
+    public record UserResponse(String id, String username, UserRole role) {
         private static UserResponse from(UserAccount account) {
-            return new UserResponse(account.id(), account.username(), account.role(), null);
+            return new UserResponse(account.id(), account.username(), account.role());
         }
     }
 }
