@@ -18,10 +18,11 @@ const dishImageUrl = (restaurantName, imagePath) => {
     .getPublicUrl(storagePath).data.publicUrl;
 };
 
-export default function RestaurantMenu({ restaurant, onBack }) {
+export default function RestaurantMenu({ restaurant, role, onBack }) {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const normalizedRole = role?.toUpperCase();
 
   useEffect(() => {
     const loadMenu = async () => {
@@ -50,7 +51,7 @@ export default function RestaurantMenu({ restaurant, onBack }) {
   return (
     <>
       <button type="button" onClick={onBack}>
-        Back to restaurants
+        Back 
       </button>
       <h3>{restaurant.restaurant_name} Menu</h3>
       {loading && <p>Loading menu...</p>}
@@ -77,6 +78,24 @@ export default function RestaurantMenu({ restaurant, onBack }) {
             )}
             <p>Status: {item.availability ? "Available" : "Unavailable"}</p>
             {item.item_cost != null && <p>${item.item_cost}</p>}
+            {normalizedRole === "CUSTOMER" && (
+              <div>
+                <label>
+                  Quantity: 
+                  <input type="number" name="quantity" min="0" defaultValue="0" />
+                </label>
+                <button type="button" name="add">Add</button>
+              </div>
+            )}
+            {normalizedRole === "RESTAURANT_STAFF" && (
+              <div>
+                <button type="button" name="edit">Edit</button>
+                <button type="button" name="status">Status</button>
+              </div>
+            )}
+            {normalizedRole === "COURIER" && (
+              <button type="button" name="status">Status</button>
+            )}
           </article>
         ))}
       </section>
