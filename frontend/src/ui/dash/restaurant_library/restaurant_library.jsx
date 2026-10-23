@@ -3,6 +3,7 @@ import { api } from '../../../api';
 import { storageUrl } from '../storage';
 import RestaurantMenu from '../menu_page/menu_page.jsx';
 import OrderHistory from '../order_history.jsx';
+import RestaurantDashboard from '../restaurant_dashboard/restaurant_dashboard.jsx';
 import './restaurant_library.css';
 
 export default function RestaurantList({ user }) {
@@ -10,6 +11,7 @@ export default function RestaurantList({ user }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
+  const [selectedView, setSelectedView] = useState('menu');
   const [ordersVersion, setOrdersVersion] = useState(0);
 
   useEffect(() => {
@@ -21,10 +23,21 @@ export default function RestaurantList({ user }) {
     return () => { active = false; };
   }, []);
 
+  const openRestaurant = (restaurant, view = 'menu') => {
+    setSelectedView(view);
+    setSelectedRestaurant(restaurant);
+  };
+
   return (
     <>
       <main>
-        {selectedRestaurant ? (
+        {selectedRestaurant && selectedView === 'orders' ? (
+          <RestaurantDashboard
+            restaurant={selectedRestaurant}
+            user={user}
+            onBack={() => setSelectedRestaurant(null)}
+          />
+        ) : selectedRestaurant ? (
           <RestaurantMenu
             key={selectedRestaurant.id}
             restaurant={selectedRestaurant}
@@ -46,15 +59,18 @@ export default function RestaurantList({ user }) {
                   <div className="restaurant-card" key={restaurant.id}>
                     {logo && <img src={logo} alt={`${restaurant.name} logo`} width={120} height={120} />}
                     <h4>{restaurant.name}</h4>
-                    <button className="primary-button" type="button" onClick={() => setSelectedRestaurant(restaurant)}>Menu</button>
-                    {canManage && <button className="secondary-button" type="button" onClick={() => setSelectedRestaurant(restaurant)}>Edit menu</button>}
+                    <button className="primary-button" type="button" onClick={() => openRestaurant(restaurant)}>Menu</button>
+                    {canManage && <>
+                      <button className="secondary-button" type="button" onClick={() => openRestaurant(restaurant)}>Edit menu</button>
+                      <button className="secondary-button" type="button" onClick={() => openRestaurant(restaurant, 'orders')}>Manage orders</button>
+                    </>}
                   </div>
                 );
               })}
             </section>
           </>
         )}
-        {user?.role !== 'COURIER' && <OrderHistory refreshVersion={ordersVersion} />}
+        {user?.role !== 'COURIER' && !(selectedRestaurant && selectedView === 'orders') && <OrderHistory refreshVersion={ordersVersion} />}
       </main>
       <footer><p>&copy; 2023 Midnight Munchies. All rights reserved.</p></footer>
     </>

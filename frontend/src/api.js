@@ -61,5 +61,20 @@ export const api = {
     method: "POST",
     body: JSON.stringify({ lines })
   }),
-  orders: () => request("/api/ord/orders")
+  orders: () => request("/api/ord/orders"),
+  preparationQueue: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/preparation`),
+  acceptOrder: (restaurantId, orderId) => request(`/api/ord/restaurants/${restaurantId}/orders/${orderId}/accept`, {
+    method: "POST"
+  }),
+  rejectOrder: (restaurantId, orderId, reason) => request(`/api/ord/restaurants/${restaurantId}/orders/${orderId}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason })
+  }),
+  startNextPreparation: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/preparation/next`, {
+    method: "POST"
+  }),
+  markOrderReady: (restaurantId, orderId) => request(`/api/ord/restaurants/${restaurantId}/orders/${orderId}/ready`, {
+    method: "POST"
+  }),
+  orderEvents: (orderId) => request(`/api/ord/orders/${orderId}/events`)
 };
