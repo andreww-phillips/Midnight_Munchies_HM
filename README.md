@@ -33,36 +33,73 @@ Midnight_Munchies/
 └── .gitattributes
 ```
 
-## Running the Frontend
+## Starting the Application
 
-Run these commands from `frontend/`:
+The backend and frontend run as separate processes. Start each one in its own
+terminal and leave both terminals open.
+
+### Terminal 1: Backend
+
+From the repository root, change to `backend/`.
+
+PowerShell:
+
+```powershell
+cd .\backend
+.\mvnw.cmd spring-boot:run
+```
+
+Git Bash:
+
+```bash
+cd backend
+./mvnw.cmd spring-boot:run
+```
+
+The backend starts at `http://localhost:8080`. Wait until the terminal reports
+that `BackendApplication` has started before using the frontend.
+
+### Terminal 2: Frontend
+
+From the repository root, change to `frontend/`.
+
+Install dependencies the first time:
 
 ```bash
 npm ci
+```
+
+Start the development server:
+
+```bash
 npm run dev
 ```
 
-Build and lint the frontend with:
+Open the URL printed by Vite, usually `http://localhost:5173`.
+
+### Stopping the Application
+
+Press `Ctrl+C` in each terminal running the backend or frontend.
+
+## Testing and Building
+
+Run backend tests from `backend/`:
+
+PowerShell:
+
+```powershell
+.\mvnw.cmd test
+```
+
+Git Bash:
+
+```bash
+./mvnw.cmd test
+```
+
+Run frontend linting and a production build from `frontend/`:
 
 ```bash
 npm run lint
 npm run build
-```
-
-## Running the Backend
-
-Run these commands from `backend/`:
-
-Windows:
-
-```powershell
-.\mvnw.cmd spring-boot:run
-.\mvnw.cmd test
-```
-
-macOS/Linux:
-
-```bash
-./mvnw spring-boot:run
-./mvnw test
 ```
