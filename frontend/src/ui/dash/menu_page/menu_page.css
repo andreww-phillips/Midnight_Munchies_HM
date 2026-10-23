@@ -1,0 +1,10 @@
+.menu-item img {
+  width: 128px;
+  height: 128px;
+  object-fit: cover;
+  margin: 0 auto;
+}
+
+.menu-item {
+  text-align: center;
+}

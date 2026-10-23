@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../../supabaseClient"; // adjust path to match your folder
+import RestaurantMenu from "../menu_page/menu_page.jsx";
 import "./restaurant_library.css";
 
 const BUCKET = "Restaurant Logos"; // the bucket's id, not its display name
@@ -16,6 +17,7 @@ const logoUrl = (path) =>
 export default function RestaurantList({ role }) {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   const normalizedRole = role?.toUpperCase();
 
   const loadRestaurants = async () => {
@@ -51,37 +53,52 @@ export default function RestaurantList({ role }) {
     loadRestaurants();
   }, []);
 
+  const openMenu = (restaurant) => {
+    setSelectedRestaurant(restaurant);
+  };
+
   return (
     <>
     <main>
-      <h3>Restaurants</h3>
+      {selectedRestaurant ? (
+        <RestaurantMenu
+          restaurant={selectedRestaurant}
+          onBack={() => setSelectedRestaurant(null)}
+        />
+      ) : (
+        <>
+          <h3>Restaurants</h3>
 
-      {loading && <p>Loading...</p>}
-      {!loading && restaurants.length === 0 && <p>No restaurants yet.</p>}
+          {loading && <p>Loading...</p>}
+          {!loading && restaurants.length === 0 && <p>No restaurants yet.</p>}
 
-      <section id="restaurant-list">
-        {restaurants.map((r) => (
-          <div className="restaurant-card" key={r.id}>
-            <img
-              src={logoUrl(r.restaurant_logo)}
-              alt={`${r.restaurant_name} logo`}
-              width={120}
-              height={120}
-            />
-            <h4>{r.restaurant_name}</h4>
-            <button type="button" name="menu">Menu</button>
-            {normalizedRole === "COURIER" && (
-              <button type="button" name="orders">Orders</button> //orders to deliver and status
-            )}
-            {normalizedRole === "RESTAURANT_STAFF" && (
-              <>
-                <button type="button" name="orders">Orders</button> //orders to prep
-                <button type="button" name="edit">Edit</button> //edit menu and status 
-              </>
-            )}
-          </div>
-        ))}
-      </section>
+          <section id="restaurant-list">
+            {restaurants.map((r) => (
+              <div className="restaurant-card" key={r.id}>
+                <img
+                  src={logoUrl(r.restaurant_logo)}
+                  alt={`${r.restaurant_name} logo`}
+                  width={120}
+                  height={120}
+                />
+                <h4>{r.restaurant_name}</h4>
+                <button type="button" name="menu" onClick={() => openMenu(r)}>
+                  Menu
+                </button>
+                {normalizedRole === "COURIER" && (
+                  <button type="button" name="orders">Orders</button>
+                )}
+                {normalizedRole === "RESTAURANT_STAFF" && (
+                  <>
+                    <button type="button" name="orders">Orders</button>
+                    <button type="button" name="edit">Edit</button>
+                  </>
+                )}
+              </div>
+            ))}
+          </section>
+        </>
+      )}
     </main>
     <footer>
       <p>&copy; 2023 Midnight Munchies. All rights reserved.</p>
