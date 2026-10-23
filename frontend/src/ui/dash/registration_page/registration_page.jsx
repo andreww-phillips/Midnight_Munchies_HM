@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import RestaurantList from "../restaurant_library/restaurant_library.jsx";
 import { api } from "../../../api";
+import { useCommandLog } from "../output_console/command_log";
+import { CommandLogProvider } from "../output_console/command_log_provider";
+import OutputConsole from "../output_console/output_console";
 
 function readFile(file) {
   if (!file) return Promise.resolve(null);
@@ -12,7 +15,10 @@ function readFile(file) {
   });
 }
 
-export default function RegistrationPage() {
+function RegistrationScreen() {
+  const { record, changeIdentity } = useCommandLog();
+  const submitting = useRef(false);
+  const authVersion = useRef(0);
   const [isLogin, setIsLogin] = useState(true);
   const [user, setUser] = useState(null);
   const [error, setError] = useState("");
@@ -28,19 +34,21 @@ export default function RegistrationPage() {
     work_id: "",
     address_longitude: 0.0,       
     address_latitude: 0.0,  
-    status: "",
     menu: null, 
     logo: null
   });
 
   useEffect(() => {
     let active = true;
-    api.currentUser().then((account) => { if (active) setUser(account); })
+    const version = authVersion.current;
+    api.currentUser().then((account) => {
+      if (active && version === authVersion.current) { changeIdentity(`${account.id}:${account.role}`); setUser(account); }
+    })
       .catch((sessionError) => {
-        if (active && sessionError.status !== 401) setError(sessionError.message);
+        if (active && version === authVersion.current && sessionError.status !== 401) setError(sessionError.message);
       });
     return () => { active = false; };
-  }, []);
+  }, [changeIdentity]);
 
   // Handle standard text/select inputs
   const handleChange = (e) => {
@@ -62,31 +70,40 @@ export default function RegistrationPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting.current) return;
     setError("");
+    const action = isLogin ? 'Log in' : 'Register';
+    const validationError = (message) => {
+      setError(message);
+      record({ action, outcome: 'error', message });
+    };
     if (!isLogin) {
       if (!formData.role) {
-        setError("Please select a role.");
+        validationError("Please select a role.");
         return;
       }
       if (formData.role === "customer" &&
         (!formData.first_name || !formData.last_name ||
           formData.address_longitude === "" || formData.address_latitude === "")) {
-        setError("Please complete all customer profile fields.");
+        validationError("Please complete all customer profile fields.");
         return;
       }
       if (formData.role === "courier" && !formData.work_id) {
-        setError("Please complete all courier profile fields.");
+        validationError("Please complete all courier profile fields.");
         return;
       }
       if (formData.role === "restaurant" && !formData.restaurant_name.trim()) {
-        setError("Please provide the restaurant name.");
+        validationError("Please provide the restaurant name.");
         return;
       }
     }
+    submitting.current = true;
+    authVersion.current += 1;
     setIsSubmitting(true);
     try {
+      let account;
       if (isLogin) {
-        setUser(await api.login(formData.username, formData.password));
+        account = await api.login(formData.username, formData.password);
       } else {
         const role = formData.role === "restaurant" ? "RESTAURANT_STAFF" : formData.role.toUpperCase();
         const details = formData.role === "restaurant" ? {
@@ -94,22 +111,36 @@ export default function RegistrationPage() {
           restaurantLogo: await readFile(formData.logo),
           menu: await readFile(formData.menu),
         } : {};
-        setUser(await api.register(formData.username, formData.password, role, details));
+        account = await api.register(formData.username, formData.password, role, details);
       }
+      changeIdentity(`${account.id}:${account.role}`, { action, outcome: 'success', message: isLogin ? 'Logged in successfully.' : 'Account registered successfully.' });
+      setUser(account);
     } catch (err) {
-      setError(err.status === 401 ? "Invalid username or password." : err.message);
+      const message = err.status === 401 ? "Invalid username or password." : err.message;
+      setError(message);
+      record({ action, outcome: 'error', message, httpStatus: err.status });
     } finally {
+      submitting.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleLogout = async () => {
+    if (submitting.current) return;
+    submitting.current = true;
+    authVersion.current += 1;
+    setIsSubmitting(true);
     try {
       await api.logout();
     } catch (logoutError) {
       setError(logoutError.message);
+      record({ action: 'Log out', outcome: 'error', message: logoutError.message, httpStatus: logoutError.status });
       return;
+    } finally {
+      submitting.current = false;
+      setIsSubmitting(false);
     }
+    changeIdentity(null, { action: 'Log out', outcome: 'success', message: 'Logged out successfully.' });
     setUser(null);
     setError("");
     setFormData({
@@ -122,11 +153,19 @@ export default function RegistrationPage() {
       work_id: "",
       address_longitude: "",
       address_latitude: "",
-      status: "",
       menu: null,
       logo: null,
     });
   };
+
+  const handleSessionExpired = useCallback((message) => {
+    authVersion.current += 1;
+    changeIdentity(null, { action: 'Session expired', outcome: 'error', message: 'Your session expired. Please log in again.', httpStatus: 401 });
+    setUser(null);
+    setIsLogin(true);
+    setError(message);
+    setFormData((previous) => ({ ...previous, password: "" }));
+  }, [changeIdentity]);
 
   if (user) {
     return (
@@ -137,10 +176,11 @@ export default function RegistrationPage() {
             <h1>Welcome, {user.username}</h1>
             <p className="muted">Role: {user.role}</p>
           </div>
-          <button className="secondary-button" type="button" onClick={handleLogout}>Log out</button>
+          <button className="secondary-button" type="button" disabled={isSubmitting} onClick={handleLogout}>Log out</button>
         </header>
         {error && <p role="alert">{error}</p>}
-        <RestaurantList user={user} />
+        <RestaurantList key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleSessionExpired} />
+        <OutputConsole />
       </div>
     );
   }
@@ -229,9 +269,14 @@ export default function RegistrationPage() {
           </button>
         </form>
       </main>
+      <div className="auth-console"><OutputConsole /></div>
       <footer>
         <p>&copy; 2023 Midnight Munchies. All rights reserved.</p>
       </footer>
     </>
   );
+}
+
+export default function RegistrationPage() {
+  return <CommandLogProvider><RegistrationScreen /></CommandLogProvider>;
 }

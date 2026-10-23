@@ -1,10 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../api";
 import { formatPrice } from "./menu_format";
 import { dishImageUrl } from "../storage";
 import "./menu_page.css";
+import { useCommandLog } from "../output_console/command_log";
 
 export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced }) {
+  const { record } = useCommandLog();
+  const commandBusy = useRef(false);
   const [menuItems, setMenuItems] = useState([]);
   const [cart, setCart] = useState({});
   const [loading, setLoading] = useState(true);
@@ -48,17 +51,30 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
     setPrice("");
   };
 
-  const changeMenu = async (operation, onSuccess) => {
-    if (!canManage || busy) return;
+  const changeMenu = async (action, operation, onSuccess) => {
+    if (!canManage || busy || commandBusy.current) return;
+    commandBusy.current = true;
     setError("");
     setPending("menu");
     try {
-      await operation();
+      let result;
+      try {
+        result = await operation();
+      } catch (changeError) {
+        setError(changeError.message);
+        record({ action, outcome: 'error', restaurantId: restaurant.id, message: changeError.message, httpStatus: changeError.status });
+        return;
+      }
+      record({ action, outcome: 'success', restaurantId: restaurant.id, status: result?.status, message: `${action} completed.` });
       onSuccess?.();
-      await refreshMenu();
-    } catch (changeError) {
-      setError(changeError.message);
+      try {
+        await refreshMenu();
+      } catch (refreshError) {
+        setError(`Menu change succeeded, but the menu could not refresh: ${refreshError.message}`);
+        record({ action: 'Refresh menu', outcome: 'error', restaurantId: restaurant.id, message: refreshError.message, httpStatus: refreshError.status });
+      }
     } finally {
+      commandBusy.current = false;
       setPending(null);
     }
   };
@@ -68,14 +84,16 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
     if (!canManage || busy) return;
     if (!name.trim()) {
       setError("Menu item name is required.");
+      record({ action: editingItemId ? 'Edit menu item' : 'Add menu item', outcome: 'error', restaurantId: restaurant.id, message: 'Menu item name is required.' });
       return;
     }
     if (!price.trim() || !Number.isFinite(Number(price)) || Number(price) < 0) {
       setError("Price must be a nonnegative number.");
+      record({ action: editingItemId ? 'Edit menu item' : 'Add menu item', outcome: 'error', restaurantId: restaurant.id, message: 'Price must be a nonnegative number.' });
       return;
     }
     // Send the decimal text to BigDecimal without rounding it through a JavaScript number.
-    await changeMenu(() => editingItemId
+    await changeMenu(editingItemId ? 'Edit menu item' : 'Add menu item', () => editingItemId
       ? api.editMenuItem(restaurant.id, editingItemId, name.trim(), price.trim())
       : api.addMenuItem(restaurant.id, name.trim(), price.trim()), resetEditor);
   };
@@ -98,19 +116,28 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
   const total = cartLines.reduce((sum, line) => sum + Number(line.item.price) * line.quantity, 0);
 
   const placeOrder = async () => {
-    if (!canOrder || busy || !cartLines.length) return;
+    if (!canOrder || busy || commandBusy.current || !cartLines.length) return;
+    commandBusy.current = true;
     setError("");
     setPending("order");
     try {
-      const order = await api.placeOrder(restaurant.id, cartLines.map(({ item, quantity }) => ({
-        menuItemId: item.id,
-        quantity
-      })));
+      let order;
+      try {
+        order = await api.placeOrder(restaurant.id, cartLines.map(({ item, quantity }) => ({
+          menuItemId: item.id,
+          quantity
+        })));
+      } catch (orderError) {
+        setError(orderError.message);
+        record({ action: 'Place order', outcome: 'error', restaurantId: restaurant.id, message: orderError.message, httpStatus: orderError.status });
+        return;
+      }
+      record({ action: 'Place order', outcome: 'success', restaurantId: restaurant.id, orderId: order.id, status: order.status,
+        message: `Order #${order.id} placed successfully.` });
       setCart({});
       onOrderPlaced?.(order);
-    } catch (orderError) {
-      setError(orderError.message);
     } finally {
+      commandBusy.current = false;
       setPending(null);
     }
   };
@@ -124,7 +151,13 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
           {canOrder && <span className="muted">{formatPrice(total)} in cart</span>}
           <button className="link-button" type="button" disabled={busy} onClick={async () => {
             setError("");
-            try { await refreshMenu(); } catch (loadError) { setError(loadError.message); }
+            try {
+              await refreshMenu();
+              record({ action: 'Refresh menu', outcome: 'success', restaurantId: restaurant.id, message: 'Menu refreshed.' });
+            } catch (loadError) {
+              setError(loadError.message);
+              record({ action: 'Refresh menu', outcome: 'error', restaurantId: restaurant.id, message: loadError.message, httpStatus: loadError.status });
+            }
           }}>Refresh menu</button>
         </div>
       </div>
@@ -173,10 +206,11 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
                     setName(item.name);
                     setPrice(String(item.price));
                   }}>Edit</button>
-                  <button className="secondary-button" type="button" disabled={busy} aria-label={(available ? "Mark sold out: " : "Mark available: ") + item.name} onClick={() => changeMenu(() => api.changeMenuItemAvailability(
+                  <button className="secondary-button" type="button" disabled={busy} aria-label={(available ? "Mark sold out: " : "Mark available: ") + item.name} onClick={() => changeMenu('Change menu availability', () => api.changeMenuItemAvailability(
                     restaurant.id, item.id, available ? "SOLD_OUT" : "AVAILABLE"
                   ))}>{available ? "Mark sold out" : "Mark available"}</button>
                   <button className="remove-menu-item" type="button" disabled={busy} aria-label={"Remove " + item.name} onClick={() => changeMenu(
+                    'Remove menu item',
                     () => api.removeMenuItem(restaurant.id, item.id),
                     () => { if (editingItemId === item.id) resetEditor(); }
                   )}>Remove</button>

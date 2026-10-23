@@ -1,0 +1,14 @@
+.output-console { margin: 32px 0; padding: 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); text-align: left; }
+.output-console summary { cursor: pointer; color: var(--text-h); font-weight: 700; }
+.output-console > p { margin-top: 12px; }
+.console-entries { max-height: 340px; overflow: auto; padding: 0; list-style: none; }
+.console-entry { border-left: 4px solid var(--accent); background: var(--accent-bg); border-radius: 6px; margin-top: 12px; padding: 12px; overflow-wrap: anywhere; }
+.console-entry--error { border-color: #dc2626; background: #fee2e2; color: #991b1b; }
+.console-entry--error .muted { color: inherit; }
+.console-entry-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.console-entry time { font-size: 13px; }
+.auth-console { width: min(700px, calc(100% - 32px)); margin: 0 auto; }
+.order-event-history { margin-top: 12px; }
+.order-event-history h5 { margin: 12px 0; overflow-wrap: anywhere; }
+.order-event-history ol { display: grid; gap: 12px; }
+.order-event-history li { overflow-wrap: anywhere; }
