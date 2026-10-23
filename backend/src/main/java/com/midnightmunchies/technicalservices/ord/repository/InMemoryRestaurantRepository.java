@@ -1,6 +1,7 @@
 package com.midnightmunchies.technicalservices.ord.repository;
 
 import com.midnightmunchies.domain.ord.Restaurant;
+import com.midnightmunchies.domain.ord.CatalogNames;
 import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
 
 import java.util.List;
@@ -20,8 +21,9 @@ public class InMemoryRestaurantRepository implements RestaurantRepository {
 	}
 
 	@Override
-	public Restaurant save(Restaurant restaurant) {
+	public synchronized Restaurant save(Restaurant restaurant) {
 		Objects.requireNonNull(restaurant, "restaurant must not be null");
+		CatalogNames.requireUniqueRestaurant(restaurant, restaurants.values());
 		restaurants.put(restaurant.getId(), restaurant);
 		return restaurant;
 	}

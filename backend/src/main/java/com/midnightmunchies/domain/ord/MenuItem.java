@@ -24,7 +24,7 @@ public final class MenuItem {
 			String image, List<String> description) {
 		this.id = Objects.requireNonNull(id, "id must not be null");
 		this.restaurantId = Objects.requireNonNull(restaurantId, "restaurantId must not be null");
-		this.name = OrdValidation.requireName(name);
+		this.name = OrdValidation.requireName(CatalogNames.normalize(name));
 		this.price = OrdValidation.requirePrice(price);
 		this.status = Objects.requireNonNull(status, "status must not be null");
 		this.image = image;

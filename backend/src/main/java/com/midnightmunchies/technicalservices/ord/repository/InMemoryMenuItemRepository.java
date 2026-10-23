@@ -1,6 +1,7 @@
 package com.midnightmunchies.technicalservices.ord.repository;
 
 import com.midnightmunchies.domain.ord.MenuItem;
+import com.midnightmunchies.domain.ord.CatalogNames;
 import com.midnightmunchies.domain.ord.repository.MenuItemRepository;
 
 import java.util.List;
@@ -20,8 +21,9 @@ public class InMemoryMenuItemRepository implements MenuItemRepository {
 	}
 
 	@Override
-	public MenuItem save(MenuItem menuItem) {
+	public synchronized MenuItem save(MenuItem menuItem) {
 		Objects.requireNonNull(menuItem, "menuItem must not be null");
+		CatalogNames.requireUniqueMenuItem(menuItem, menuItems.values());
 		menuItems.put(menuItem.getId(), menuItem);
 		return menuItem;
 	}

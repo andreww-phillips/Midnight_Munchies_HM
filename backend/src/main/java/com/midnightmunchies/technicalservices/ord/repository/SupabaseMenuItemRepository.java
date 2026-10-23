@@ -3,6 +3,7 @@ package com.midnightmunchies.technicalservices.ord.repository;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.midnightmunchies.domain.ord.MenuItem;
+import com.midnightmunchies.domain.ord.CatalogNames;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.repository.MenuItemRepository;
 import org.springframework.core.ParameterizedTypeReference;
@@ -42,7 +43,8 @@ public class SupabaseMenuItemRepository implements MenuItemRepository {
     }
 
     @Override
-    public MenuItem save(MenuItem item) {
+    public synchronized MenuItem save(MenuItem item) {
+        CatalogNames.requireUniqueMenuItem(item, findByRestaurantId(item.getRestaurantId()));
         catalog.save("Menu_Items", new Row(item.getId(), item.getRestaurantId(), item.getName(), item.getPrice(),
                 item.getStatus() == MenuItemStatus.AVAILABLE, item.getImage(), item.getDescription()));
         return item;

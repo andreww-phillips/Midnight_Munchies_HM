@@ -3,6 +3,7 @@ package com.midnightmunchies.technicalservices.ord.repository;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.midnightmunchies.domain.ord.Restaurant;
+import com.midnightmunchies.domain.ord.CatalogNames;
 import com.midnightmunchies.domain.ord.RestaurantStatus;
 import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
 import org.springframework.core.ParameterizedTypeReference;
@@ -31,11 +32,12 @@ public class SupabaseRestaurantRepository implements RestaurantRepository {
     }
 
     @Override
-    public Restaurant save(Restaurant restaurant) {
+    public synchronized Restaurant save(Restaurant restaurant) {
         // The existing registration schema uses Restaurant.id = the staff account's id.
         if (!restaurant.getId().equals(restaurant.getOwnerId())) {
             throw new IllegalArgumentException("Restaurant ID must match its registered staff account");
         }
+        CatalogNames.requireUniqueRestaurant(restaurant, findAll());
         catalog.save("Restaurant", new Row(restaurant.getId(), restaurant.getName(), restaurant.getLatitude(),
                 restaurant.getLongitude(), restaurant.getLogo() == null ? "" : restaurant.getLogo(), restaurant.getMenu()));
         return restaurant;

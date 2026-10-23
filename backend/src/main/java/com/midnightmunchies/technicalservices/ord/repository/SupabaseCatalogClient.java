@@ -1,5 +1,7 @@
 package com.midnightmunchies.technicalservices.ord.repository;
 
+import com.midnightmunchies.domain.ord.CatalogNames;
+import com.midnightmunchies.domain.ord.DuplicateNameException;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
@@ -79,7 +81,7 @@ public class SupabaseCatalogClient {
         }
     }
 
-    private CatalogAccessException failure(String operation, String table, RestClientException exception) {
+    private RuntimeException failure(String operation, String table, RestClientException exception) {
         if (exception instanceof RestClientResponseException response) {
             String code = "";
             String message = "";
@@ -93,9 +95,17 @@ public class SupabaseCatalogClient {
             // Log diagnostic codes, never request headers, keys, or row details.
             LOG.warn("Supabase {} {} failed: HTTP {}, database code {}, message {}",
                     operation, table, response.getStatusCode().value(), code, message);
+            if (code.equals("23505")) {
+                if (table.equals("Restaurant") && message.contains("restaurants_normalized_name_unique")) {
+                    return new DuplicateNameException(CatalogNames.RESTAURANT_DUPLICATE);
+                }
+                if (table.equals("Menu_Items") && message.contains("menu_items_restaurant_name_unique")) {
+                    return new DuplicateNameException(CatalogNames.MENU_ITEM_DUPLICATE);
+                }
+            }
             if (table.equals("Menu_Items") && (code.equals("23505") || code.equals("23502"))) {
                 return new CatalogAccessException(
-                        "The menu database needs the issue 7 schema update. Item names must be allowed to repeat, and images and descriptions must be optional.",
+                        "The menu database needs the latest catalog schema updates. Item names must be unique within each restaurant, names may repeat across restaurants, and images and descriptions must be optional.",
                         409, exception);
             }
         } else {

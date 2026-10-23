@@ -27,7 +27,7 @@ public final class Restaurant {
 			String logo, String menu) {
 		this.id = Objects.requireNonNull(id, "id must not be null");
 		this.ownerId = ownerId;
-		this.name = OrdValidation.requireName(name);
+		this.name = OrdValidation.requireName(CatalogNames.normalize(name));
 		this.status = Objects.requireNonNull(status, "status must not be null");
 		if (!Double.isFinite(latitude) || latitude < -90 || latitude > 90) {
 			throw new IllegalArgumentException("latitude must be finite and between -90 and 90");
