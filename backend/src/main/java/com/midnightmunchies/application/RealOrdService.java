@@ -63,7 +63,7 @@ public class RealOrdService implements OrdService {
                     || item.getStatus() != com.midnightmunchies.domain.ord.MenuItemStatus.AVAILABLE) {
                 throw new IllegalArgumentException("Menu item is unavailable for this restaurant");
             }
-            return new OrderLine(item.getId(), line.quantity(), item.getPrice());
+            return new OrderLine(item.getId(), item.getName(), line.quantity(), item.getPrice());
         }).toList();
 
         Order order = new Order(UUID.randomUUID(), UUID.fromString(user.id()), restaurantId, orderLines, Instant.now());

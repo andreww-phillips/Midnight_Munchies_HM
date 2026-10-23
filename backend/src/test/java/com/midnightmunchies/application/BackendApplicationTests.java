@@ -42,7 +42,7 @@ class BackendApplicationTests {
 		Restaurant restaurant = new Restaurant(UUID.randomUUID(), "Diner", RestaurantStatus.OPEN, 45.5, -73.5);
 		MenuItem item = new MenuItem(UUID.randomUUID(), restaurant.getId(), "Poutine",
 				new BigDecimal("12.35"), MenuItemStatus.AVAILABLE);
-		OrderLine line = new OrderLine(item.getId(), 2, item.getPrice());
+		OrderLine line = new OrderLine(item.getId(), item.getName(), 2, item.getPrice());
 		Order order = new Order(UUID.randomUUID(), customerId, restaurant.getId(), List.of(line), Instant.now());
 
 		restaurants.save(restaurant);
@@ -55,6 +55,8 @@ class BackendApplicationTests {
 		assertEquals(List.of(order), orders.findByCustomerId(customerId));
 		assertEquals(item.getId(), orders.findById(order.getId()).orElseThrow()
 				.getOrderLines().getFirst().getMenuItemId());
+		assertEquals(item.getName(), orders.findById(order.getId()).orElseThrow()
+				.getOrderLines().getFirst().getMenuItemName());
 	}
 
 }
