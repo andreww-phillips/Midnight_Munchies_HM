@@ -33,6 +33,8 @@ public interface OrdService {
 
     Order markOrderReady(UUID restaurantId, UUID orderId, HttpSession session);
 
+    Order cancelOrder(UUID orderId, HttpSession session);
+
     record OrderLineRequest(UUID menuItemId, int quantity) {
     }
 }

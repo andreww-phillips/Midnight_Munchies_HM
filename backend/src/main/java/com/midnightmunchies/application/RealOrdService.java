@@ -1,15 +1,18 @@
 package com.midnightmunchies.application;
 
+import com.midnightmunchies.domain.ord.IllegalOrderTransitionException;
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderLine;
+import com.midnightmunchies.domain.ord.OrderStatus;
 import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.RestaurantStatus;
 import com.midnightmunchies.domain.ord.repository.MenuItemRepository;
 import com.midnightmunchies.domain.ord.repository.OrderRepository;
 import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
 import com.midnightmunchies.domain.reg.UserAccount;
+import com.midnightmunchies.domain.reg.UserRole;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -139,6 +142,21 @@ public class RealOrdService implements OrdService {
     public Order markOrderReady(UUID restaurantId, UUID orderId, HttpSession session) {
         Order order = requireRestaurantOrder(restaurantId, orderId);
         return preparationQueue.markReady(order);
+    }
+
+    @Override
+    public Order cancelOrder(UUID orderId, HttpSession session) {
+        Order order = requireOrder(orderId);
+        UserAccount user = currentUser(session);
+        if (user != null && user.role() == UserRole.CUSTOMER) {
+            if (!order.getCustomerId().equals(UUID.fromString(user.id()))) {
+                throw new OrderNotFoundException("Order does not exist");
+            }
+            if (order.getStatus() != OrderStatus.PLACED) {
+                throw new IllegalOrderTransitionException(order.getStatus(), "cancel");
+            }
+        }
+        return preparationQueue.cancel(order);
     }
 
     private UserAccount currentUser(HttpSession session) {
