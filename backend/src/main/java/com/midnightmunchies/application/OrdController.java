@@ -104,6 +104,25 @@ public class OrdController {
         return execute(() -> authorizedService.viewOrders(session));
     }
 
+    @PostMapping("/restaurants/{restaurantId}/orders/{orderId}/accept")
+    public ResponseEntity<?> acceptOrder(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID orderId,
+            HttpSession session
+    ) {
+        return execute(() -> authorizedService.acceptOrder(restaurantId, orderId, session));
+    }
+
+    @PostMapping("/restaurants/{restaurantId}/orders/{orderId}/reject")
+    public ResponseEntity<?> rejectOrder(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID orderId,
+            @RequestBody RejectOrderRequest request,
+            HttpSession session
+    ) {
+        return execute(() -> authorizedService.rejectOrder(restaurantId, orderId, request.reason(), session));
+    }
+
     @PostMapping("/restaurants/{restaurantId}/preparation/next")
     public ResponseEntity<?> startNextPreparation(@PathVariable UUID restaurantId, HttpSession session) {
         return execute(() -> authorizedService.startNextPreparation(restaurantId, session));
@@ -177,6 +196,9 @@ public class OrdController {
     }
 
     public record PlaceOrderRequest(List<OrdService.OrderLineRequest> lines) {
+    }
+
+    public record RejectOrderRequest(String reason) {
     }
 
     public record MenuItemRequest(String name, BigDecimal price) {
