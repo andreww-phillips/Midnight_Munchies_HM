@@ -93,6 +93,9 @@ public class RealOrdService implements OrdService {
         }
 
         List<OrderLine> orderLines = lines.stream().map(line -> {
+            if (line == null || line.menuItemId() == null) {
+                throw new IllegalArgumentException("Each order line must reference a menu item");
+            }
             MenuItem item = menuItemRepository.findById(line.menuItemId())
                     .orElseThrow(() -> new IllegalArgumentException("Menu item does not exist"));
             if (!item.getRestaurantId().equals(restaurantId)
