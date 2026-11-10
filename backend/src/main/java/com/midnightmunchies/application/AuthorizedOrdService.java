@@ -16,6 +16,11 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Authorization proxy for OrdService.
+ * Enforces authentication, role, and restaurant ownership checks for menu
+ * mutations and restaurant order commands before delegating to the real service.
+ */
 @Service
 public class AuthorizedOrdService implements OrdService {
     private static final String SESSION_USER = "authenticatedUser";

@@ -1,6 +1,9 @@
 package com.midnightmunchies.domain.ord;
 
-/** Status vocabulary only; transition rules belong to the future order State implementation. */
+/**
+ * Status vocabulary; transition rules are enforced by OrderState implementations.
+ * PICKED_UP, DELIVERED, and REFUNDED are reserved for future lifecycle support.
+ */
 public enum OrderStatus {
 	PLACED,
 	ACCEPTED,

@@ -124,6 +124,9 @@ public class RealOrdService implements OrdService {
             throw new IllegalArgumentException("At least one order line is required");
         }
 
+        // Validate every requested line before saving the order.
+        // Capture names and prices from the server catalog so later menu changes
+        // do not alter this purchase's recorded details.
         List<OrderLine> orderLines = lines.stream().map(line -> {
             if (line == null || line.menuItemId() == null) {
                 throw new IllegalArgumentException("Each order line must reference a menu item");

@@ -155,6 +155,9 @@ function RestaurantOrders({ restaurant, onSessionExpired }) {
         setNotice(successMessage);
         setConfirmedOrder(updatedOrder);
       }
+      // The command may already have succeeded even if this refresh fails.
+      // Preserve its confirmed result and require a successful refresh before
+      // another command, rather than replaying the mutation.
       setLoading(true);
       try {
         const snapshot = await readDashboard(restaurant.id);
