@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import RestaurantList from "../restaurant_library/restaurant_library.jsx";
+import MapPage from "../map_page/map_page.jsx";
 import { api } from "../../../api";
 import { useCommandLog } from "../output_console/command_log";
 import { CommandLogProvider } from "../output_console/command_log_provider";
@@ -23,6 +24,8 @@ function RegistrationScreen() {
   const [user, setUser] = useState(null);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [view, setView] = useState("restaurants");
+  const [openRequest, setOpenRequest] = useState(null);
   const [formData, setFormData] = useState({
     role: "",
     username: "",
@@ -142,6 +145,8 @@ function RegistrationScreen() {
     }
     changeIdentity(null, { action: 'Log out', outcome: 'success', message: 'Logged out successfully.' });
     setUser(null);
+    setView("restaurants");
+    setOpenRequest(null);
     setError("");
     setFormData({
       role: "",
@@ -162,6 +167,8 @@ function RegistrationScreen() {
     authVersion.current += 1;
     changeIdentity(null, { action: 'Session expired', outcome: 'error', message: 'Your session expired. Please log in again.', httpStatus: 401 });
     setUser(null);
+    setView("restaurants");
+    setOpenRequest(null);
     setIsLogin(true);
     setError(message);
     setFormData((previous) => ({ ...previous, password: "" }));
@@ -179,7 +186,22 @@ function RegistrationScreen() {
           <button className="secondary-button" type="button" disabled={isSubmitting} onClick={handleLogout}>Log out</button>
         </header>
         {error && <p role="alert">{error}</p>}
-        <RestaurantList key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleSessionExpired} />
+        {user.role !== "CUSTOMER" && (
+          <nav className="view-switcher" aria-label="Dashboard views">
+            <button type="button" aria-pressed={view === "restaurants"}
+              className={view === "restaurants" ? "primary-button" : "secondary-button"}
+              onClick={() => { setOpenRequest(null); setView("restaurants"); }}>Restaurants</button>
+            <button type="button" aria-pressed={view === "map"}
+              className={view === "map" ? "primary-button" : "secondary-button"}
+              onClick={() => { setOpenRequest(null); setView("map"); }}>Map</button>
+          </nav>
+        )}
+        {view === "map" && user.role !== "CUSTOMER" ? (
+          <MapPage key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleSessionExpired}
+            onOpenRestaurant={(restaurant, mode) => { setOpenRequest({ restaurantId: restaurant.id, view: mode }); setView("restaurants"); }} />
+        ) : (
+          <RestaurantList key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleSessionExpired} initialOpen={openRequest} />
+        )}
         <OutputConsole />
       </div>
     );

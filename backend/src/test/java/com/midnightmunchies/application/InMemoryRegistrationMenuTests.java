@@ -47,6 +47,32 @@ class InMemoryRegistrationMenuTests {
     }
 
     @Test
+    void registeredRestaurantsArePlacedAroundTheCityCenterWithoutOverlapping() throws Exception {
+        MockHttpSession first = new MockHttpSession();
+        MockHttpSession second = new MockHttpSession();
+        String firstId = register(first, "RESTAURANT_STAFF", "Center Diner " + UUID.randomUUID());
+        String secondId = register(second, "RESTAURANT_STAFF", "Center Diner " + UUID.randomUUID());
+        String restaurants = mvc.perform(get("/api/ord/restaurants").session(first))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        String firstPosition = position(restaurants, firstId);
+        String secondPosition = position(restaurants, secondId);
+        assertNotEquals(firstPosition, secondPosition);
+        for (String id : List.of(firstId, secondId)) {
+            List<Double> latitudes = JsonPath.read(restaurants, "$[?(@.id == '" + id + "')].latitude");
+            List<Double> longitudes = JsonPath.read(restaurants, "$[?(@.id == '" + id + "')].longitude");
+            assertTrue(Math.abs(latitudes.get(0) - 45.5017) <= 0.016);
+            assertTrue(Math.abs(longitudes.get(0) + 73.5673) <= 0.016);
+        }
+    }
+
+    private String position(String restaurants, String id) {
+        List<Double> latitudes = JsonPath.read(restaurants, "$[?(@.id == '" + id + "')].latitude");
+        List<Double> longitudes = JsonPath.read(restaurants, "$[?(@.id == '" + id + "')].longitude");
+        return latitudes.get(0) + "," + longitudes.get(0);
+    }
+
+    @Test
     void registeredStaffCanEditToggleAndRemoveItemsWhileExistingOrdersKeepTheirDetails() throws Exception {
         MockHttpSession staff = new MockHttpSession();
         String restaurantId = register(staff, "RESTAURANT_STAFF", "Order Diner");

@@ -76,5 +76,6 @@ export const api = {
   markOrderReady: (restaurantId, orderId) => request(`/api/ord/restaurants/${restaurantId}/orders/${orderId}/ready`, {
     method: "POST"
   }),
-  orderEvents: (orderId) => request(`/api/ord/orders/${orderId}/events`)
+  orderEvents: (orderId) => request(`/api/ord/orders/${orderId}/events`),
+  cityMap: () => request("/api/dash/map")
 };

@@ -46,8 +46,9 @@ public class AuthService {
         try {
             if (role == UserRole.RESTAURANT_STAFF) {
                 UUID ownerId = UUID.fromString(account.id());
+                Restaurant.Position position = Restaurant.defaultPositionFor(ownerId);
                 restaurants.save(new Restaurant(ownerId, ownerId, name, RestaurantStatus.OPEN,
-                        0, 0, restaurantLogo, menu));
+                        position.latitude(), position.longitude(), restaurantLogo, menu));
             }
             return account;
         } catch (RuntimeException exception) {
