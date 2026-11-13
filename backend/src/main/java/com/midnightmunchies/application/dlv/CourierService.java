@@ -5,6 +5,7 @@ import com.midnightmunchies.domain.dlv.Assignment;
 import com.midnightmunchies.domain.dlv.AssignmentStatus;
 import com.midnightmunchies.domain.dlv.Courier;
 import com.midnightmunchies.domain.dlv.CourierState;
+import com.midnightmunchies.domain.dlv.Location;
 import com.midnightmunchies.domain.ord.Actor;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderEvent;
@@ -24,7 +25,6 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -70,17 +70,23 @@ public class CourierService implements OrderEventListener {
             Courier courier = findOrCreate(identity.getId());
             try {
                 if (onDuty) {
-                    courier.goOnDuty();
+                    if (courier.getState() == CourierState.OFFLINE) {
+                        courier.goOnDuty();
+                    }
                 } else {
-                    courier.goOffline();
+                    Optional<Assignment> offer = assignments.findActiveByCourierId(courier.getId())
+                            .filter(assignment -> assignment.status() == AssignmentStatus.OFFERED);
+                    offer.ifPresent(assignment -> {
+                        assignments.save(assignment.reassign());
+                        dispatchQueue.enqueue(assignment.orderId());
+                    });
+                    courier.goOffDuty();
                 }
             } catch (IllegalStateException exception) {
                 throw new DeliveryConflictException(exception.getMessage());
             }
             couriers.save(courier);
-            if (onDuty) {
-                retryDispatch(null);
-            }
+            retryDispatch(null);
             return view(account);
         }
     }
@@ -96,7 +102,7 @@ public class CourierService implements OrderEventListener {
             Order order = findReadyOrder(orderId);
             Courier courier = findOrCreate(identity.getId());
             try {
-                courier.accept(orderId);
+                courier.acceptOrder(order);
             } catch (IllegalStateException exception) {
                 throw new DeliveryConflictException(exception.getMessage());
             }
@@ -111,18 +117,13 @@ public class CourierService implements OrderEventListener {
         synchronized (dispatchLock) {
             Assignment assignment = requireAssignment(orderId, identity.getId(), AssignmentStatus.ACCEPTED);
             Order order = findReadyOrder(orderId);
+            Courier courier = findOrCreate(identity.getId());
             try {
-                order.pickUp();
+                courier.confirmPickup();
             } catch (IllegalStateException exception) {
                 throw new DeliveryConflictException(exception.getMessage());
             }
             transitions.save(order, new Actor(identity.getId(), UserRole.COURIER));
-            Courier courier = findOrCreate(identity.getId());
-            try {
-                courier.pickUp(orderId);
-            } catch (IllegalStateException exception) {
-                throw new DeliveryConflictException(exception.getMessage());
-            }
             couriers.save(courier);
             Assignment pickedUp = assignments.save(assignment.pickUp(clock.instant()));
             return new AssignmentView(pickedUp, order);
@@ -135,17 +136,13 @@ public class CourierService implements OrderEventListener {
             Assignment assignment = requireAssignment(orderId, identity.getId(), AssignmentStatus.PICKED_UP);
             Order order = orders.findById(orderId)
                     .orElseThrow(() -> new DeliveryNotFoundException("Order does not exist"));
-            if (order.getStatus() != OrderStatus.PICKED_UP) {
-                throw new DeliveryConflictException("Only a picked-up order can be delivered");
-            }
-            order.deliver();
-            transitions.save(order, new Actor(identity.getId(), UserRole.COURIER));
             Courier courier = findOrCreate(identity.getId());
             try {
-                courier.deliver(orderId);
+                courier.confirmDelivery();
             } catch (IllegalStateException exception) {
                 throw new DeliveryConflictException(exception.getMessage());
             }
+            transitions.save(order, new Actor(identity.getId(), UserRole.COURIER));
             couriers.save(courier);
             Assignment delivered = assignments.save(assignment.deliver(clock.instant()));
             retryDispatch(null);
@@ -167,18 +164,22 @@ public class CourierService implements OrderEventListener {
             }
             Courier oldCourier = findOrCreate(previous.courierId());
             Courier newCourier = newCourierId == null ? null : findOrCreate(newCourierId);
-            if (newCourier != null && !newCourier.getId().equals(oldCourier.getId())
-                    && !newCourier.isIdleOnDuty()) {
+            if (newCourier != null && (!newCourier.isOnDuty()
+                    || (newCourier.getState() != CourierState.IDLE
+                    && !newCourier.getId().equals(oldCourier.getId()))
+                    || assignments.findActiveByCourierId(newCourier.getId())
+                    .filter(assignment -> !assignment.orderId().equals(orderId)).isPresent())) {
                 throw new DeliveryConflictException("The selected courier is not idle and on duty");
             }
 
-            oldCourier.release(orderId);
+            if (previous.status() == AssignmentStatus.ACCEPTED) {
+                oldCourier.releaseOrder(order);
+            }
             couriers.save(oldCourier);
             assignments.save(previous.reassign());
             dispatchQueue.remove(orderId);
 
             if (newCourier != null) {
-                newCourier.offer(orderId);
                 couriers.save(newCourier);
                 Assignment replacement = assignments.save(Assignment.offer(orderId, newCourier.getId(), clock.instant()));
                 return new AssignmentView(replacement, order);
@@ -217,7 +218,8 @@ public class CourierService implements OrderEventListener {
     private void retryDispatch(UUID excludedCourierId) {
         while (true) {
             Optional<Courier> idleCourier = couriers.findAll().stream()
-                    .filter(Courier::isIdleOnDuty)
+                    .filter(courier -> courier.getState() == CourierState.IDLE)
+                    .filter(courier -> assignments.findActiveByCourierId(courier.getId()).isEmpty())
                     .filter(courier -> !courier.getId().equals(excludedCourierId))
                     .findFirst();
             if (idleCourier.isEmpty()) {
@@ -234,8 +236,6 @@ public class CourierService implements OrderEventListener {
                 continue;
             }
             Courier courier = idleCourier.get();
-            courier.offer(orderId);
-            couriers.save(courier);
             assignments.save(Assignment.offer(orderId, courier.getId(), clock.instant()));
         }
     }
@@ -276,7 +276,8 @@ public class CourierService implements OrderEventListener {
     }
 
     private Courier findOrCreate(UUID courierId) {
-        return couriers.findById(courierId).orElseGet(() -> couriers.save(new Courier(courierId)));
+        return couriers.findById(courierId)
+                .orElseGet(() -> couriers.save(new Courier(courierId, new Location(0, 0))));
     }
 
     private Courier requireCourier(UserAccount account) {
