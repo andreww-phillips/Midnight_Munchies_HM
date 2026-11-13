@@ -1,3 +1,48 @@
 package com.midnightmunchies.application.dlv;
 
-// Phase III architecture placeholder for delivery assignment commands.
+import jakarta.servlet.http.HttpSession;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/dlv")
+@CrossOrigin(allowCredentials = "true", origins = "http://localhost:5173")
+public class DeliveryAssignmentController extends DlvControllerSupport {
+    private final CourierService courierService;
+
+    public DeliveryAssignmentController(CourierService courierService) {
+        this.courierService = courierService;
+    }
+
+    @PostMapping("/orders/{orderId}/accept")
+    public ResponseEntity<?> accept(@PathVariable UUID orderId, HttpSession session) {
+        return execute(() -> courierService.accept(account(session), orderId));
+    }
+
+    @PostMapping("/orders/{orderId}/reassign")
+    public ResponseEntity<?> reassign(@PathVariable UUID orderId, @RequestBody(required = false) ReassignRequest request,
+                                      HttpSession session) {
+        return execute(() -> {
+            UUID courierId = null;
+            if (request != null && request.courierId() != null && !request.courierId().isBlank()) {
+                try {
+                    courierId = UUID.fromString(request.courierId());
+                } catch (IllegalArgumentException exception) {
+                    throw new IllegalArgumentException("courierId must be a valid UUID");
+                }
+            }
+            return courierService.reassign(account(session), orderId, courierId);
+        });
+    }
+
+    public record ReassignRequest(String courierId) {
+    }
+}

@@ -1,0 +1,42 @@
+.courier-dashboard {
+  margin-top: 24px;
+}
+
+.courier-dashboard .section-heading {
+  align-items: flex-start;
+}
+
+.courier-state,
+.courier-empty-state,
+.courier-delivery-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.courier-empty-state,
+.courier-delivery-card {
+  margin: 20px 0;
+}
+
+.courier-empty-state h3,
+.courier-delivery-heading h3 {
+  margin: 0;
+  color: var(--text-h);
+}
+
+.courier-delivery-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.courier-delivery-card ul {
+  padding-left: 20px;
+}
+
+.courier-delivery-card .primary-button {
+  margin-top: 8px;
+}

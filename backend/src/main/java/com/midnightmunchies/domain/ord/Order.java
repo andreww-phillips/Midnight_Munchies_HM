@@ -91,6 +91,14 @@ public final class Order {
 		transitionTo(state.markReady());
 	}
 
+	public void pickUp() {
+		transitionTo(state.pickUp());
+	}
+
+	public void deliver() {
+		transitionTo(state.deliver());
+	}
+
 	public void cancel() {
 		transitionTo(state.cancel());
 	}

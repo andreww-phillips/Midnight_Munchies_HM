@@ -7,6 +7,8 @@ final class OrderStates {
 	static final OrderState ACCEPTED = new Accepted();
 	static final OrderState PREPARING = new Preparing();
 	static final OrderState READY = new Ready();
+	static final OrderState PICKED_UP = new PickedUp();
+	static final OrderState DELIVERED = new Delivered();
 	static final OrderState REJECTED = new Rejected();
 	static final OrderState CANCELLED = new Cancelled();
 
@@ -19,6 +21,8 @@ final class OrderStates {
 			case ACCEPTED -> ACCEPTED;
 			case PREPARING -> PREPARING;
 			case READY -> READY;
+			case PICKED_UP -> PICKED_UP;
+			case DELIVERED -> DELIVERED;
 			case REJECTED -> REJECTED;
 			case CANCELLED -> CANCELLED;
 			default -> throw new IllegalArgumentException("Orders cannot be restored with status " + status);
@@ -85,6 +89,30 @@ final class OrderStates {
 		@Override
 		public OrderStatus status() {
 			return OrderStatus.READY;
+		}
+
+		@Override
+		public OrderState pickUp() {
+			return PICKED_UP;
+		}
+	}
+
+	private static final class PickedUp extends AbstractOrderState {
+		@Override
+		public OrderStatus status() {
+			return OrderStatus.PICKED_UP;
+		}
+
+		@Override
+		public OrderState deliver() {
+			return DELIVERED;
+		}
+	}
+
+	private static final class Delivered extends AbstractOrderState {
+		@Override
+		public OrderStatus status() {
+			return OrderStatus.DELIVERED;
 		}
 	}
 

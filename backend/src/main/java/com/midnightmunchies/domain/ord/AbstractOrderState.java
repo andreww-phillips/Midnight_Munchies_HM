@@ -24,6 +24,16 @@ abstract class AbstractOrderState implements OrderState {
 	}
 
 	@Override
+	public OrderState pickUp() {
+		throw illegal("pick up");
+	}
+
+	@Override
+	public OrderState deliver() {
+		throw illegal("deliver");
+	}
+
+	@Override
 	public OrderState cancel() {
 		throw illegal("cancel");
 	}

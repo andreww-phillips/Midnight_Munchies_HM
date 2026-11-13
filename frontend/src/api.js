@@ -76,5 +76,23 @@ export const api = {
   markOrderReady: (restaurantId, orderId) => request(`/api/ord/restaurants/${restaurantId}/orders/${orderId}/ready`, {
     method: "POST"
   }),
-  orderEvents: (orderId) => request(`/api/ord/orders/${orderId}/events`)
+  orderEvents: (orderId) => request(`/api/ord/orders/${orderId}/events`),
+  courierDashboard: () => request("/api/dlv/courier"),
+  setCourierDuty: (onDuty) => request("/api/dlv/courier/duty", {
+    method: "PUT",
+    body: JSON.stringify({ onDuty })
+  }),
+  acceptDelivery: (orderId) => request(`/api/dlv/orders/${orderId}/accept`, {
+    method: "POST"
+  }),
+  pickUpDelivery: (orderId) => request(`/api/dlv/orders/${orderId}/pickup`, {
+    method: "POST"
+  }),
+  deliverOrder: (orderId) => request(`/api/dlv/orders/${orderId}/deliver`, {
+    method: "POST"
+  }),
+  reassignDelivery: (orderId, courierId) => request(`/api/dlv/orders/${orderId}/reassign`, {
+    method: "POST",
+    body: JSON.stringify(courierId ? { courierId } : {})
+  })
 };
