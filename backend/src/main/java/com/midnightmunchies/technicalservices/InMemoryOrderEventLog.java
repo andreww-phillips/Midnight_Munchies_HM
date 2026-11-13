@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 @Repository
-public class InMemoryOrderEventLog implements OrderEventLog {
+public class InMemoryOrderEventLog implements OrderEventLog, SimulatorStore {
 
 	private final Map<UUID, OrderEvent> events = new LinkedHashMap<>();
 
@@ -35,5 +35,10 @@ public class InMemoryOrderEventLog implements OrderEventLog {
 		return events.values().stream()
 				.filter(event -> event.orderId().equals(orderId))
 				.toList();
+	}
+
+	@Override
+	public synchronized void clear() {
+		events.clear();
 	}
 }

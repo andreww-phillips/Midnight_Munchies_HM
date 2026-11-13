@@ -56,6 +56,32 @@ class RestaurantTests {
 		assertThrows(NullPointerException.class, () -> new Restaurant(UUID.randomUUID(), "Diner", null, 0, 0));
 	}
 
+	@Test
+	void defaultPositionIsStableForTheSameId() {
+		UUID id = UUID.fromString("40000000-0000-0000-0000-000000000001");
+
+		assertEquals(Restaurant.defaultPositionFor(id), Restaurant.defaultPositionFor(id));
+	}
+
+	@Test
+	void defaultPositionsDifferForDifferentIds() {
+		Restaurant.Position first = Restaurant.defaultPositionFor(UUID.fromString("40000000-0000-0000-0000-000000000001"));
+		Restaurant.Position second = Restaurant.defaultPositionFor(UUID.fromString("40000000-0000-0000-0000-000000000002"));
+
+		assertNotEquals(first, second);
+	}
+
+	@Test
+	void defaultPositionStaysNearTheCityCenter() {
+		for (int i = 0; i < 200; i++) {
+			Restaurant.Position position = Restaurant.defaultPositionFor(UUID.randomUUID());
+			assertTrue(Math.abs(position.latitude() - Restaurant.CITY_CENTER_LATITUDE) <= 0.016);
+			assertTrue(Math.abs(position.longitude() - Restaurant.CITY_CENTER_LONGITUDE) <= 0.016);
+			assertTrue(Math.hypot(position.latitude() - Restaurant.CITY_CENTER_LATITUDE,
+					position.longitude() - Restaurant.CITY_CENTER_LONGITUDE) >= 0.0079);
+		}
+	}
+
 	private Restaurant restaurant(double latitude, double longitude) {
 		return new Restaurant(UUID.randomUUID(), "Diner", RestaurantStatus.OPEN, latitude, longitude);
 	}

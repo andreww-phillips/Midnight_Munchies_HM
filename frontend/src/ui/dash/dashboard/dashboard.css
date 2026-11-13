@@ -1,0 +1,14 @@
+.tab-bar { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.tab { border: none; background: none; padding: 10px 16px; font: inherit; font-weight: 600; color: var(--text); cursor: pointer; border-bottom: 3px solid transparent; }
+.tab:hover { color: var(--text-h); }
+.tab.is-active { color: var(--text-h); border-bottom-color: var(--accent, #6b4fd8); }
+.info-area { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.info-block { display: grid; gap: 4px; align-content: start; }
+.info-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text); }
+.info-user, .info-restaurant-name { font-weight: 700; color: var(--text-h); }
+.info-stats { display: flex; gap: 16px; margin: 0; }
+.info-stats dt { font-size: 12px; color: var(--text); }
+.info-stats dd { margin: 0; font-weight: 700; color: var(--text-h); }
+.info-controls { justify-items: start; gap: 8px; }
+.module-placeholder { display: grid; gap: 8px; margin-bottom: 32px; }
+.details-note { margin: 0; color: #d64545; font-weight: 600; }

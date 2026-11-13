@@ -11,12 +11,14 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AuthService {
     private final Map<String, UserAccount> users = new ConcurrentHashMap<>();
+    private final Set<String> seededUsernames = ConcurrentHashMap.newKeySet();
     private final RestaurantRepository restaurants;
 
     public AuthService(RestaurantRepository restaurants) {
@@ -46,8 +48,9 @@ public class AuthService {
         try {
             if (role == UserRole.RESTAURANT_STAFF) {
                 UUID ownerId = UUID.fromString(account.id());
+                Restaurant.Position position = Restaurant.defaultPositionFor(ownerId);
                 restaurants.save(new Restaurant(ownerId, ownerId, name, RestaurantStatus.OPEN,
-                        0, 0, restaurantLogo, menu));
+                        position.latitude(), position.longitude(), restaurantLogo, menu));
             }
             return account;
         } catch (RuntimeException exception) {
@@ -77,8 +80,13 @@ public class AuthService {
         seed(UUID.randomUUID(), username, password, role);
     }
 
+    public void removeRegisteredAccounts() {
+        users.keySet().retainAll(seededUsernames);
+    }
+
     private void seed(UUID id, String username, String password, UserRole role) {
         users.put(username, new UserAccount(id.toString(), username, hash(password), role));
+        seededUsernames.add(username);
     }
 
     private boolean matches(String password, String passwordHash) {

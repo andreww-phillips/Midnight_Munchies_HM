@@ -1,1 +1,1 @@
-// Phase III DASH architecture placeholder for the city map.
+export { default } from './map_page/map_page.jsx';
