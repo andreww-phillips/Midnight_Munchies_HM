@@ -13,6 +13,7 @@ import com.midnightmunchies.domain.ord.OrderEvent;
 import com.midnightmunchies.domain.ord.OrderEventListener;
 import com.midnightmunchies.domain.ord.OrderRepository;
 import com.midnightmunchies.domain.ord.OrderStatus;
+import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.RestaurantRepository;
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
@@ -330,7 +331,12 @@ public class CourierService implements OrderEventListener {
 
     private Courier findOrCreate(UUID courierId) {
         return couriers.findById(courierId)
-                .orElseGet(() -> couriers.save(new Courier(courierId, new Location(0, 0))));
+                .orElseGet(() -> couriers.save(new Courier(courierId, startingLocation(courierId))));
+    }
+
+    private static Location startingLocation(UUID courierId) {
+        Restaurant.Position position = Restaurant.defaultPositionFor(courierId);
+        return new Location(position.latitude(), position.longitude());
     }
 
     private Courier requireCourier(UserAccount account) {
