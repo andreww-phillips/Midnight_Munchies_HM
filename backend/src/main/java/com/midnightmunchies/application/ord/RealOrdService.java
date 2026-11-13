@@ -17,7 +17,9 @@ import com.midnightmunchies.domain.ord.RestaurantRepository;
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
 import com.midnightmunchies.application.reg.AuthenticationRequiredException;
+import com.midnightmunchies.application.prc.OrderLedgerService;
 import com.midnightmunchies.technicalservices.InMemoryOrderEventLog;
+import com.midnightmunchies.technicalservices.LedgerRepository;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,7 @@ public class RealOrdService implements OrdService {
     private final OrderRepository orderRepository;
     private final PreparationQueue preparationQueue;
     private final OrderEventLog eventLog;
+    private final OrderLedgerService orderLedger;
 
     public RealOrdService(
             RestaurantRepository restaurantRepository,
@@ -54,7 +57,6 @@ public class RealOrdService implements OrdService {
         this(restaurantRepository, menuItemRepository, orderRepository, preparationQueue, new InMemoryOrderEventLog());
     }
 
-    @Autowired
     public RealOrdService(
             RestaurantRepository restaurantRepository,
             MenuItemRepository menuItemRepository,
@@ -62,11 +64,25 @@ public class RealOrdService implements OrdService {
             PreparationQueue preparationQueue,
             OrderEventLog eventLog
     ) {
+        this(restaurantRepository, menuItemRepository, orderRepository, preparationQueue,
+                eventLog, new OrderLedgerService(orderRepository, new LedgerRepository()));
+    }
+
+    @Autowired
+    public RealOrdService(
+            RestaurantRepository restaurantRepository,
+            MenuItemRepository menuItemRepository,
+            OrderRepository orderRepository,
+            PreparationQueue preparationQueue,
+            OrderEventLog eventLog,
+            OrderLedgerService orderLedger
+    ) {
         this.eventLog = eventLog;
         this.restaurantRepository = restaurantRepository;
         this.menuItemRepository = menuItemRepository;
         this.orderRepository = orderRepository;
         this.preparationQueue = preparationQueue;
+        this.orderLedger = orderLedger;
     }
 
     @Override
@@ -142,7 +158,9 @@ public class RealOrdService implements OrdService {
         }).toList();
 
         Order order = new Order(UUID.randomUUID(), UUID.fromString(user.id()), restaurantId, orderLines, Instant.now());
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        orderLedger.recordCreated(saved);
+        return saved;
     }
 
     @Override
