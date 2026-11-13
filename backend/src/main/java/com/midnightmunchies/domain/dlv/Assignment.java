@@ -35,6 +35,12 @@ public record Assignment(
                 Objects.requireNonNull(at, "at must not be null"), null, null, null, null);
     }
 
+    public Assignment decline(Instant at) {
+        requireStatus(AssignmentStatus.OFFERED);
+        return new Assignment(id, orderId, courierId, AssignmentStatus.DECLINED, offeredAt,
+                null, null, null);
+    }
+
     public Assignment pickUp(Instant at) {
         requireStatus(AssignmentStatus.ACCEPTED);
         return new Assignment(id, orderId, courierId, AssignmentStatus.PICKED_UP, offeredAt,

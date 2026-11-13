@@ -8,9 +8,9 @@ function DeliveryCard({ assignment, onAction, busy }) {
   const { order } = assignment;
   const status = assignment.assignment.status;
   const action = {
-    OFFERED: ['Accept offer', 'accept'],
+    OFFERED: ['Accept offer', 'accept', 'Decline offer', 'decline'],
     ACCEPTED: ['Confirm pickup', 'pickup'],
-    PICKED_UP: ['Confirm delivery', 'deliver']
+    PICKED_UP: ['Confirm delivery', 'deliver'],
   }[status];
 
   return (
@@ -40,6 +40,16 @@ function DeliveryCard({ assignment, onAction, busy }) {
             </button>
           )}
         </div>
+      )}
+      {action?.[2] && (
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={busy}
+          onClick={() => onAction(action[3], order.id)}
+        >
+          {action[2]}
+        </button>
       )}
     </article>
   );

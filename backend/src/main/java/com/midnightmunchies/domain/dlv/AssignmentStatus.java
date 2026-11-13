@@ -5,6 +5,6 @@ public enum AssignmentStatus {
     ACCEPTED,
     PICKED_UP,
     DELIVERED,
-    DECLINED,
-    REASSIGNED
+    REASSIGNED,
+    DECLINED
 }
