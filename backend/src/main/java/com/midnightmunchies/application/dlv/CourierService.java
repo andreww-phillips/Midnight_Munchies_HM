@@ -44,6 +44,18 @@ public class CourierService implements OrderEventListener {
         this(couriers, assignments, orders, dispatchQueue, transitions, Clock.systemUTC());
     }
 
+    public AssignmentView decline(UserAccount account, UUID orderId) {
+        Courier identity = requireCourier(account);
+        synchronized (dispatchLock) {
+            Assignment assignment = requireAssignment(orderId, identity.getId(), AssignmentStatus.OFFERED);
+            Order order = findReadyOrder(orderId);
+            dispatchQueue.enqueue(order);
+            Assignment declined = assignments.save(assignment.reassign());
+            retryDispatch(identity.getId());
+            return new AssignmentView(declined, order);
+        }
+    }
+
     CourierService(CourierRepository couriers, AssignmentRepository assignments, OrderRepository orders,
                    DispatchQueueService dispatchQueue, OrderTransitions transitions, Clock clock) {
         this.couriers = Objects.requireNonNull(couriers, "couriers must not be null");
@@ -52,6 +64,7 @@ public class CourierService implements OrderEventListener {
         this.dispatchQueue = Objects.requireNonNull(dispatchQueue, "dispatchQueue must not be null");
         this.transitions = Objects.requireNonNull(transitions, "transitions must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
+        restoreQueuedOrders();
     }
 
     public CourierDashboard view(UserAccount account) {
@@ -77,8 +90,12 @@ public class CourierService implements OrderEventListener {
                     Optional<Assignment> offer = assignments.findActiveByCourierId(courier.getId())
                             .filter(assignment -> assignment.status() == AssignmentStatus.OFFERED);
                     offer.ifPresent(assignment -> {
-                        assignments.save(assignment.reassign());
-                        dispatchQueue.enqueue(assignment.orderId());
+                        orders.findById(assignment.orderId())
+                                .filter(order -> order.getStatus() == OrderStatus.READY)
+                                .ifPresent(order -> {
+                                    dispatchQueue.enqueue(order);
+                                    assignments.save(assignment.reassign());
+                                });
                     });
                     courier.goOffDuty();
                 }
@@ -172,21 +189,26 @@ public class CourierService implements OrderEventListener {
                 throw new DeliveryConflictException("The selected courier is not idle and on duty");
             }
 
+            if (newCourier != null) {
+                if (previous.status() == AssignmentStatus.ACCEPTED) {
+                    oldCourier.releaseOrder(order);
+                }
+                couriers.save(oldCourier);
+                assignments.save(previous.reassign());
+                dispatchQueue.remove(orderId);
+                couriers.save(newCourier);
+                Assignment replacement = assignments.save(Assignment.offer(orderId, newCourier.getId(), clock.instant()));
+                retryDispatch(null);
+                return new AssignmentView(replacement, order);
+            }
+
+            dispatchQueue.enqueue(order);
             if (previous.status() == AssignmentStatus.ACCEPTED) {
                 oldCourier.releaseOrder(order);
             }
             couriers.save(oldCourier);
             assignments.save(previous.reassign());
-            dispatchQueue.remove(orderId);
-
-            if (newCourier != null) {
-                couriers.save(newCourier);
-                Assignment replacement = assignments.save(Assignment.offer(orderId, newCourier.getId(), clock.instant()));
-                return new AssignmentView(replacement, order);
-            }
-
-            dispatchQueue.enqueue(orderId);
-            retryDispatch(oldCourier.getId());
+            retryDispatch(null);
             return assignments.findActiveByOrderId(orderId)
                     .map(this::assignmentView)
                     .orElse(new AssignmentView(null, order));
@@ -209,7 +231,7 @@ public class CourierService implements OrderEventListener {
                     .filter(order -> order.getStatus() == OrderStatus.READY)
                     .filter(order -> assignments.findActiveByOrderId(order.getId()).isEmpty())
                     .ifPresent(order -> {
-                        dispatchQueue.enqueue(order.getId());
+                        dispatchQueue.enqueue(order);
                         retryDispatch(null);
                     });
         }
@@ -225,18 +247,34 @@ public class CourierService implements OrderEventListener {
             if (idleCourier.isEmpty()) {
                 return;
             }
-            Optional<UUID> nextOrderId = dispatchQueue.poll();
+            Optional<UUID> nextOrderId = dispatchQueue.peek();
             if (nextOrderId.isEmpty()) {
                 return;
             }
             UUID orderId = nextOrderId.get();
-            Optional<Order> readyOrder = orders.findById(orderId)
-                    .filter(order -> order.getStatus() == OrderStatus.READY);
-            if (readyOrder.isEmpty() || assignments.findActiveByOrderId(orderId).isPresent()) {
+            Optional<Order> readyOrder = orders.findById(orderId);
+            if (readyOrder.isEmpty()) {
+                return;
+            }
+            if (readyOrder.get().getStatus() != OrderStatus.READY
+                    || assignments.findActiveByOrderId(orderId).isPresent()) {
+                dispatchQueue.remove(orderId);
                 continue;
             }
             Courier courier = idleCourier.get();
             assignments.save(Assignment.offer(orderId, courier.getId(), clock.instant()));
+            dispatchQueue.remove(orderId);
+        }
+    }
+
+    private void restoreQueuedOrders() {
+        for (Order queuedOrder : dispatchQueue.restoreOrders()) {
+            Optional<Order> existing = orders.findById(queuedOrder.getId());
+            if (existing.isEmpty()) {
+                orders.save(queuedOrder);
+            } else if (existing.get().getStatus() != OrderStatus.READY) {
+                dispatchQueue.remove(queuedOrder.getId());
+            }
         }
     }
 

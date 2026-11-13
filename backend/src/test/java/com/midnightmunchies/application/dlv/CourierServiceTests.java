@@ -18,9 +18,11 @@ import com.midnightmunchies.technicalservices.CourierRepository;
 import com.midnightmunchies.technicalservices.InMemoryOrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,6 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CourierServiceTests {
+    @TempDir
+    Path tempDir;
+
     private InMemoryOrderRepository orders;
     private CourierRepository couriers;
     private AssignmentRepository assignments;
@@ -41,7 +46,7 @@ class CourierServiceTests {
         orders = new InMemoryOrderRepository();
         couriers = new CourierRepository();
         assignments = new AssignmentRepository();
-        queue = new DispatchQueueService();
+        queue = new DispatchQueueService(tempDir.resolve("dispatch-queue.txt"));
         service = new CourierService(couriers, assignments, orders, queue,
                 new OrderTransitions(orders, new OrderEventPublisher()));
     }
@@ -129,6 +134,23 @@ class CourierServiceTests {
         assertEquals(second.getId(), next.order().getId());
         assertEquals(AssignmentStatus.OFFERED, next.assignment().status());
         assertFalse(queue.view().contains(second.getId()));
+    }
+
+    @Test
+    void declinedOfferIsRetriedForAnotherIdleCourierAndRemainsQueuedOtherwise() {
+        UserAccount declining = account(UserRole.COURIER);
+        UserAccount nextCourier = account(UserRole.COURIER);
+        Order order = order(true);
+        service.setDuty(declining, true);
+        service.onEvent(event(order, OrderStatus.PREPARING, OrderStatus.READY));
+        service.setDuty(nextCourier, true);
+
+        service.decline(declining, order.getId());
+
+        assertEquals(id(nextCourier),
+                assignments.findActiveByOrderId(order.getId()).orElseThrow().courierId());
+        assertTrue(queue.view().isEmpty());
+        assertEquals(CourierState.IDLE, service.view(declining).state());
     }
 
     private Order order(boolean isReady) {

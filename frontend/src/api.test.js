@@ -63,6 +63,24 @@ describe("restaurant order API", () => {
     expect(options.body === undefined ? undefined : JSON.parse(options.body)).toEqual(body);
   });
 
+  describe("courier offer API", () => {
+    beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("declines an offer with the current courier session", async () => {
+      fetch.mockResolvedValue(new Response(JSON.stringify({ assignment: { status: "REASSIGNED" } }), { status: 200 }));
+
+      await expect(api.declineDelivery("order-1")).resolves.toEqual({
+        assignment: { status: "REASSIGNED" }
+      });
+
+      const [url, options] = fetch.mock.calls[0];
+      expect(new URL(url).pathname).toBe("/api/dlv/orders/order-1/decline");
+      expect(options.method).toBe("POST");
+      expect(options.credentials).toBe("include");
+    });
+  });
+
   it.each([400, 401, 403, 404, 409])("preserves both the backend message and HTTP %s", async (status) => {
     fetch.mockResolvedValue(new Response(JSON.stringify({ message: "Order command denied" }), { status }));
 
