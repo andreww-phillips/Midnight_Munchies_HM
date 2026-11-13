@@ -17,12 +17,8 @@ public class DemoCatalog {
     private static final UUID BURGER_OWNER = UUID.fromString("30000000-0000-0000-0000-000000000001");
 
     public DemoCatalog(RestaurantRepository restaurants, MenuItemRepository menuItems) {
-        seed(restaurants, menuItems);
-    }
-
-    public static void seed(RestaurantRepository restaurants, MenuItemRepository menuItems) {
-        restaurants.save(new Restaurant(BURGER_RESTAURANT, BURGER_OWNER, "Bobs Burgers", RestaurantStatus.OPEN, 45.5048, -73.5772));
-        restaurants.save(new Restaurant(PIZZA_RESTAURANT, "Pizza Palace", RestaurantStatus.OPEN, 45.5225, -73.5848));
+        restaurants.save(new Restaurant(BURGER_RESTAURANT, BURGER_OWNER, "Bobs Burgers", RestaurantStatus.OPEN, 45.5, -73.56));
+        restaurants.save(new Restaurant(PIZZA_RESTAURANT, "Pizza Palace", RestaurantStatus.OPEN, 45.5, -73.56));
         menuItems.save(new MenuItem(UUID.fromString("20000000-0000-0000-0000-000000000001"), BURGER_RESTAURANT, "Midnight Burger", new BigDecimal("12.99"), MenuItemStatus.AVAILABLE));
         menuItems.save(new MenuItem(UUID.fromString("20000000-0000-0000-0000-000000000002"), BURGER_RESTAURANT, "Loaded Fries", new BigDecimal("5.49"), MenuItemStatus.AVAILABLE));
         menuItems.save(new MenuItem(UUID.fromString("20000000-0000-0000-0000-000000000003"), PIZZA_RESTAURANT, "Pepperoni Pizza", new BigDecimal("16.99"), MenuItemStatus.AVAILABLE));

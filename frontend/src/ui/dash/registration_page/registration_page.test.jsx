@@ -7,7 +7,7 @@ import { api } from '../../../api';
 
 vi.mock('../../../api', () => ({ api: {
   currentUser: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(),
-  restaurants: vi.fn(), orders: vi.fn(), menu: vi.fn(), addMenuItem: vi.fn(), cityMap: vi.fn(), preparationQueue: vi.fn()
+  restaurants: vi.fn(), orders: vi.fn(), menu: vi.fn(), addMenuItem: vi.fn()
 } }));
 
 let container;
@@ -149,57 +149,4 @@ it('preserves menu images and descriptions in the integrated restaurant library'
   expect(container.querySelector('.menu-item img').src).toBe('https://example.com/poutine.png');
   expect(container.textContent).toContain('Fries, Cheese curds');
   expect(button('Add item')).toBeUndefined();
-});
-
-const tab = (text) => [...container.querySelectorAll('[role="tab"]')].find((element) => element.textContent === text);
-const mapData = (restaurant) => ({
-  bounds: { minLat: 45.5, maxLat: 45.5, minLon: -73.5, maxLon: -73.5 },
-  restaurants: [{ ...restaurant, status: 'OPEN', latitude: 45.5, longitude: -73.5,
-    pendingCount: 0, queuedCount: 2, preparingCount: 1, readyCount: 0, band: 'GREEN' }],
-  couriers: []
-});
-
-it('shows the module tabs and the map to customers', async () => {
-  const restaurant = { id: 'r1', ownerId: 'staff-1', name: 'Bobs Burgers' };
-  api.currentUser.mockResolvedValue({ id: 'customer-1', username: 'customer@example.com', role: 'CUSTOMER' });
-  api.restaurants.mockResolvedValue([restaurant]);
-  api.menu.mockResolvedValue([]);
-  api.cityMap.mockResolvedValue(mapData(restaurant));
-  await act(async () => root.render(<RegistrationPage />));
-
-  expect([...container.querySelectorAll('[role="tab"]')].map((element) => element.textContent))
-    .toEqual(['Map', 'Orders', 'Delivery', 'Pricing & History']);
-  expect(tab('Orders').getAttribute('aria-selected')).toBe('true');
-  expect(container.querySelector('.info-area').textContent).toContain('Role: CUSTOMER');
-
-  await click(tab('Map'));
-  expect(container.querySelector('.city-map')).not.toBeNull();
-  await act(async () => container.querySelector('.map-restaurant').dispatchEvent(new MouseEvent('click', { bubbles: true })));
-  await click(button('Browse menu'));
-  expect(tab('Orders').getAttribute('aria-selected')).toBe('true');
-  expect(container.querySelector('.city-map')).toBeNull();
-  expect(container.querySelector('#restaurant-list')).toBeNull();
-});
-
-it('switches staff to the map tab and opens their restaurant orders from the map', async () => {
-  const staff = { id: 'staff-1', username: 'restaurant@example.com', role: 'RESTAURANT_STAFF' };
-  const restaurant = { id: 'r1', ownerId: 'staff-1', name: 'Bobs Burgers' };
-  api.currentUser.mockResolvedValue(staff);
-  api.restaurants.mockResolvedValue([restaurant]);
-  api.menu.mockResolvedValue([]);
-  api.preparationQueue.mockResolvedValue([]);
-  api.cityMap.mockResolvedValue(mapData(restaurant));
-  await act(async () => root.render(<RegistrationPage />));
-
-  await click(tab('Map'));
-  expect(tab('Map').getAttribute('aria-selected')).toBe('true');
-  expect(container.querySelector('#restaurant-list')).toBeNull();
-
-  await act(async () => container.querySelector('.map-restaurant').dispatchEvent(new MouseEvent('click', { bubbles: true })));
-  expect(container.querySelector('.info-restaurant').textContent).toContain('Bobs Burgers');
-  await click(button('Manage orders'));
-
-  expect(container.querySelector('.city-map')).toBeNull();
-  expect(tab('Orders').getAttribute('aria-selected')).toBe('true');
-  expect(container.querySelector('h2').textContent).toBe('Bobs Burgers orders');
 });
