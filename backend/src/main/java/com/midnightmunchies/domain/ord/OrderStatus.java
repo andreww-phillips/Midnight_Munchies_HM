@@ -2,7 +2,7 @@ package com.midnightmunchies.domain.ord;
 
 /**
  * Status vocabulary; transition rules are enforced by OrderState implementations.
- * PICKED_UP, DELIVERED, and REFUNDED are reserved for future lifecycle support.
+ * REFUNDED is reserved for future lifecycle support.
  */
 public enum OrderStatus {
 	PLACED,
