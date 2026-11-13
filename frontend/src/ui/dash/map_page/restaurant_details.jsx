@@ -19,6 +19,13 @@ function canSeeQueue(user, restaurant) {
   return user?.role === 'RESTAURANT_STAFF' && restaurant.ownedByViewer === true;
 }
 
+function canSeeMenu(user, restaurant) {
+  if (user?.role === 'PLATFORM_OPERATOR') return true;
+  if (user?.role === 'RESTAURANT_STAFF') return restaurant.ownedByViewer === true;
+  if (user?.role === 'CUSTOMER') return restaurant.status === 'OPEN';
+  return false;
+}
+
 function quickActions(user, restaurant) {
   if (user?.role === 'RESTAURANT_STAFF' && canSeeQueue(user, restaurant)) {
     return [{ label: 'Manage orders', view: 'orders' }];
@@ -36,6 +43,7 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
   const [menu, setMenu] = useState([]);
   const [menuError, setMenuError] = useState('');
   const showQueue = canSeeQueue(user, restaurant);
+  const showMenu = canSeeMenu(user, restaurant);
   const actions = quickActions(user, restaurant);
   const style = bandStyle(restaurant.band);
   const countsKey = [restaurant.pendingCount, restaurant.queuedCount, restaurant.preparingCount, restaurant.readyCount].join(':');
@@ -63,6 +71,7 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
   }, [showQueue, restaurant.id, countsKey, record, onSessionExpired]);
 
   useEffect(() => {
+    if (!showMenu) return undefined;
     let active = true;
     api.menu(restaurant.id)
       .then((items) => {
@@ -81,7 +90,7 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
           restaurantId: restaurant.id, httpStatus: loadError.status });
       });
     return () => { active = false; };
-  }, [restaurant.id, countsKey, record, onSessionExpired]);
+  }, [showMenu, restaurant.id, countsKey, record, onSessionExpired]);
 
   return (
     <section className="restaurant-details" aria-label={`${restaurant.name} details`}>
@@ -97,7 +106,10 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
         <div><dt>In preparation</dt><dd>{restaurant.preparingCount}</dd></div>
         <div><dt>Ready</dt><dd>{restaurant.readyCount}</dd></div>
       </dl>
-      <div>
+      {user?.role === 'CUSTOMER' && !showMenu && (
+        <p className="muted details-menu-closed">The menu is available when the restaurant is open.</p>
+      )}
+      {showMenu && <div>
         <h4>Menu</h4>
         {menuError && <p role="alert">{menuError}</p>}
         {!menuError && menu.length === 0 && <p className="muted">No menu items yet.</p>}
@@ -111,7 +123,7 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
             ))}
           </ul>
         )}
-      </div>
+      </div>}
       {showQueue && (
         <div>
           <h4>Active orders</h4>

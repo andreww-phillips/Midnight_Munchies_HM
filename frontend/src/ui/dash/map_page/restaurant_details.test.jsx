@@ -65,13 +65,34 @@ describe('restaurant details panel', () => {
     expect(container.textContent).toContain('Status: OPEN · Band: Short (green)');
   });
 
-  it('shows menu items and marks sold out ones for every role', async () => {
-    for (const user of Object.values(users)) {
+  it('shows the menu with sold out items to the operator, the owner and customers of an open restaurant', async () => {
+    for (const user of [users.operator, users.owner, users.customer]) {
       await render(user);
       const items = [...container.querySelectorAll('.details-menu li')].map((element) => element.textContent);
       expect(items).toEqual(['Midnight Burger · $12.99', 'Loaded Fries · $5.49Sold out']);
     }
     expect(api.menu).toHaveBeenCalledWith('r1');
+  });
+
+  it('hides other restaurants menus from staff and all menus from couriers', async () => {
+    for (const user of [users.otherStaff, users.courier]) {
+      await render(user);
+      expect(container.querySelector('.details-menu')).toBeNull();
+      expect(container.textContent).not.toContain('Menu');
+    }
+    expect(api.menu).not.toHaveBeenCalled();
+  });
+
+  it('hides the menu of a paused or closed restaurant from customers', async () => {
+    for (const status of ['PAUSED', 'CLOSED']) {
+      await render(users.customer, { status });
+      expect(container.querySelector('.details-menu')).toBeNull();
+      expect(container.querySelector('.details-menu-closed').textContent).toBe('The menu is available when the restaurant is open.');
+    }
+    expect(api.menu).not.toHaveBeenCalled();
+
+    await render(users.operator, { status: 'PAUSED' });
+    expect(container.querySelectorAll('.details-menu li')).toHaveLength(2);
   });
 
   it('shows and logs a failed menu load', async () => {
