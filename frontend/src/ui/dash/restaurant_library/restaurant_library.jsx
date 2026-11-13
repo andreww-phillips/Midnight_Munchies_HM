@@ -81,7 +81,7 @@ export default function RestaurantList({ user, onSessionExpired, initialOpen = n
             </section>
           </>
         )}
-        {user?.role !== 'COURIER' && !(selectedRestaurant && selectedView === 'orders') && <OrderHistory refreshVersion={ordersVersion} />}
+        {user?.role !== 'COURIER' && !(selectedRestaurant && selectedView === 'orders') && <OrderHistory refreshVersion={ordersVersion} user={user} />}
       </main>
       <footer><p>&copy; 2023 Midnight Munchies. All rights reserved.</p></footer>
     </>

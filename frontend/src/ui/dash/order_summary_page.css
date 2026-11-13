@@ -1,0 +1,52 @@
+.order-summary {
+  flex: 1 0 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 12px 0 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
+}
+
+.order-summary .order-summary-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.order-summary h5 {
+  margin: 0;
+  color: var(--text-h);
+  font-size: 16px;
+}
+
+.order-summary .order-summary-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px 20px;
+  margin: 0 0 16px;
+}
+
+.order-summary dt {
+  font-size: 13px;
+}
+
+.order-summary dd {
+  margin: 2px 0 0;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+
+.order-summary .order-summary-items {
+  margin-bottom: 16px;
+}
+
+.order-summary .order-summary-total {
+  margin-bottom: 8px;
+  color: var(--text-h);
+}

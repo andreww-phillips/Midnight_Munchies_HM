@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../api';
 import { formatPrice } from './menu_page/menu_format';
 import OrderEventHistory from './order_event_history';
+import OrderSummaryPage from './order_summary_page';
 import { useCommandLog } from './output_console/command_log';
 
-export default function OrderHistory({ refreshVersion }) {
+export default function OrderHistory({ refreshVersion, user }) {
   const { record } = useCommandLog();
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
+  const canViewSummary = Boolean(user?.id) && ['CUSTOMER', 'PLATFORM_OPERATOR'].includes(user?.role);
   useEffect(() => {
     let active = true;
     api.orders().then((items) => {
@@ -42,6 +44,10 @@ export default function OrderHistory({ refreshVersion }) {
             </li>
           ))}</ul>
           <OrderEventHistory orderId={order.id} restaurantId={order.restaurantId} />
+          {canViewSummary && ['DELIVERED', 'REFUNDED'].includes(order.status) && (
+            <OrderSummaryPage key={`${user.id}:${order.id}`} orderId={order.id}
+              refreshVersion={`${refreshVersion ?? 0}:${refresh}`} />
+          )}
         </article>
       ))}
     </section>
