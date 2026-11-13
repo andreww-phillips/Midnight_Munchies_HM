@@ -134,6 +134,14 @@ describe('restaurant details panel', () => {
     expect(onOpenRestaurant).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }), 'orders');
   });
 
+  it('shows the Montreal area of the restaurant when known', async () => {
+    await render(users.customer, { area: 'Downtown – McGill University' });
+    expect(container.querySelector('.details-area').textContent).toBe('Area: Downtown – McGill University');
+
+    await render(users.customer, { area: null });
+    expect(container.querySelector('.details-area')).toBeNull();
+  });
+
   it('lets the operator reassign deliveries of this restaurant only', async () => {
     api.operatorDeliveries.mockResolvedValue({ active: [
       { orderId: 'ready-1', courierId: 'cccccccc-1', status: 'ACCEPTED', waitingSeconds: 90, reassignable: true },

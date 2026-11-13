@@ -1,56 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../api';
 import { useCommandLog } from '../output_console/command_log';
-import { MAP_SIZE, paddedBounds, project } from './map_geometry';
-import { BAND_STYLES, COURIER_STYLES, bandStyle, courierStyle, markerLabel } from './map_bands';
+import { paddedBounds } from './map_geometry';
+import { BAND_STYLES, COURIER_STYLES } from './map_bands';
+import SvgCityMap from './svg_city_map';
+import GoogleCityMap from './google_city_map';
 import RestaurantDetails from './restaurant_details';
 import { shortId } from '../operator_format';
 import './map_page.css';
 
-const GRID_LINES = [0.25, 0.5, 0.75];
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';
+const GOOGLE_MAPS_MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID';
 
 function lastSuccessId(entries) {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     if (entries[index].outcome === 'success') return entries[index].id;
   }
   return null;
-}
-
-function RestaurantMarker({ restaurant, point, showLabels, selected, onSelect }) {
-  const style = bandStyle(restaurant.band);
-  const labelOnLeft = point.x > MAP_SIZE.width * 0.7;
-  const select = () => onSelect(restaurant.id);
-  return (
-    <g
-      className={`map-restaurant band-${String(restaurant.band).toLowerCase()}${selected ? ' is-selected' : ''}`}
-      transform={`translate(${point.x} ${point.y})`}
-      role="button"
-      tabIndex={0}
-      aria-label={`${markerLabel(restaurant)}, ${style.label.toLowerCase()} band, ${restaurant.status.toLowerCase()}`}
-      onClick={select}
-      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(); } }}
-    >
-      <title>{markerLabel(restaurant)}</title>
-      <circle r={12} fill={style.color} />
-      {showLabels && (
-        <text className="map-label" x={labelOnLeft ? -18 : 18} dy="0.35em" textAnchor={labelOnLeft ? 'end' : 'start'}>
-          {markerLabel(restaurant)}
-        </text>
-      )}
-    </g>
-  );
-}
-
-function CourierMarker({ courier, point }) {
-  const style = courierStyle(courier.status);
-  return (
-    <g className={`map-courier courier-${String(courier.status).toLowerCase()}`} transform={`translate(${point.x} ${point.y})`}
-      aria-label={`Courier ${courier.id}, ${style.label.toLowerCase()}`}>
-      <title>{`Courier ${courier.id} · ${style.label}`}</title>
-      <polygon points="0,-11 11,0 0,11 -11,0" fill={style.color} />
-      <text className="map-badge" textAnchor="middle" dy="0.35em">{style.badge}</text>
-    </g>
-  );
 }
 
 function MapLegend() {
@@ -66,14 +32,19 @@ function MapLegend() {
   );
 }
 
-export default function MapPage({ user, onSessionExpired, onOpenRestaurant, pollMs = 5000 }) {
+export default function MapPage({
+  user, onSessionExpired, onOpenRestaurant, pollMs = 5000,
+  googleMapsApiKey = GOOGLE_MAPS_API_KEY, googleMapsMapId = GOOGLE_MAPS_MAP_ID
+}) {
   const { entries, record } = useCommandLog();
   const [cityMap, setCityMap] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
+  const [googleFailed, setGoogleFailed] = useState(false);
   const failing = useRef(false);
+  const googleFallbackLogged = useRef(false);
   const latestRequest = useRef(0);
   const mounted = useRef(true);
   const refreshKey = lastSuccessId(entries);
@@ -125,6 +96,14 @@ export default function MapPage({ user, onSessionExpired, onOpenRestaurant, poll
   const isOperator = user?.role === 'PLATFORM_OPERATOR';
   const alerts = isOperator ? restaurants.filter((restaurant) => restaurant.band === 'RED') : [];
   const waiting = isOperator ? (cityMap?.awaitingCourier ?? []) : [];
+  const useGoogle = Boolean(googleMapsApiKey) && !googleFailed;
+
+  const fallBackToSimpleMap = useCallback((reason) => {
+    if (!mounted.current || googleFallbackLogged.current) return;
+    googleFallbackLogged.current = true;
+    record({ action: 'Load Google map', outcome: 'error', message: `${reason}; showing the simple map instead.` });
+    setGoogleFailed(true);
+  }, [record]);
 
   return (
     <section className="city-map" aria-label="City map">
@@ -160,31 +139,28 @@ export default function MapPage({ user, onSessionExpired, onOpenRestaurant, poll
           </ul>
         </section>
       )}
-      {bounds && !isEmpty && (
-        <div className="map-canvas">
-          <svg viewBox={`0 0 ${MAP_SIZE.width} ${MAP_SIZE.height}`} role="group" aria-label="City map canvas">
-            <rect className="map-background" width={MAP_SIZE.width} height={MAP_SIZE.height} rx={12} />
-            {GRID_LINES.map((line) => (
-              <g key={line} className="map-grid">
-                <line x1={MAP_SIZE.width * line} y1={0} x2={MAP_SIZE.width * line} y2={MAP_SIZE.height} />
-                <line x1={0} y1={MAP_SIZE.height * line} x2={MAP_SIZE.width} y2={MAP_SIZE.height * line} />
-              </g>
-            ))}
-            {couriers.map((courier) => (
-              <CourierMarker key={courier.id} courier={courier} point={project(courier, bounds)} />
-            ))}
-            {restaurants.map((restaurant) => (
-              <RestaurantMarker
-                key={restaurant.id}
-                restaurant={restaurant}
-                point={project(restaurant, bounds)}
-                showLabels={showLabels}
-                selected={restaurant.id === selectedId}
-                onSelect={setSelectedId}
-              />
-            ))}
-          </svg>
-        </div>
+      {cityMap && useGoogle && (
+        <GoogleCityMap
+          apiKey={googleMapsApiKey}
+          mapId={googleMapsMapId}
+          restaurants={restaurants}
+          couriers={couriers}
+          bounds={isEmpty ? null : bounds}
+          showLabels={showLabels}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onUnavailable={fallBackToSimpleMap}
+        />
+      )}
+      {!useGoogle && bounds && !isEmpty && (
+        <SvgCityMap
+          restaurants={restaurants}
+          couriers={couriers}
+          bounds={bounds}
+          showLabels={showLabels}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+        />
       )}
       {cityMap && <MapLegend />}
       {selected && (

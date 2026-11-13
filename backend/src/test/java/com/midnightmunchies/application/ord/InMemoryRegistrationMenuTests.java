@@ -1,5 +1,6 @@
 package com.midnightmunchies.application.ord;
 
+import com.midnightmunchies.domain.geo.MontrealServiceArea;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,7 +48,7 @@ class InMemoryRegistrationMenuTests {
     }
 
     @Test
-    void registeredRestaurantsArePlacedAroundTheCityCenterWithoutOverlapping() throws Exception {
+    void registeredRestaurantsArePlacedInMontrealWithoutOverlapping() throws Exception {
         MockHttpSession first = new MockHttpSession();
         MockHttpSession second = new MockHttpSession();
         String firstId = register(first, "RESTAURANT_STAFF", "Center Diner " + UUID.randomUUID());
@@ -61,8 +62,8 @@ class InMemoryRegistrationMenuTests {
         for (String id : List.of(firstId, secondId)) {
             List<Double> latitudes = JsonPath.read(restaurants, "$[?(@.id == '" + id + "')].latitude");
             List<Double> longitudes = JsonPath.read(restaurants, "$[?(@.id == '" + id + "')].longitude");
-            assertTrue(Math.abs(latitudes.get(0) - 45.5017) <= 0.016);
-            assertTrue(Math.abs(longitudes.get(0) + 73.5673) <= 0.016);
+            assertTrue(MontrealServiceArea.contains(latitudes.get(0), longitudes.get(0)));
+            assertEquals(MontrealServiceArea.placeFor(UUID.fromString(id)).latitude(), latitudes.get(0));
         }
     }
 

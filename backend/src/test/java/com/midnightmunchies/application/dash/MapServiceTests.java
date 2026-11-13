@@ -121,6 +121,17 @@ class MapServiceTests {
     }
 
     @Test
+    void markersCarryTheNameOfTheirMontrealArea() {
+        restaurant("Diner", RestaurantStatus.OPEN, 45.5048, -73.5772);
+        couriers.add(new CourierMarker("c1", 45.5245, -73.5817, "IDLE"));
+
+        CityMap map = service.cityMap(loggedIn());
+
+        assertEquals("Downtown – McGill University", map.restaurants().get(0).area());
+        assertEquals("Plateau Mont-Royal – Mont-Royal Ave E", map.couriers().get(0).area());
+    }
+
+    @Test
     void onlyTheOwningStaffSeeTheirRestaurantAsOwned() {
         UUID ownerId = UUID.randomUUID();
         restaurants.save(new Restaurant(UUID.randomUUID(), ownerId, "Owned", RestaurantStatus.OPEN, 45.50, -73.57));

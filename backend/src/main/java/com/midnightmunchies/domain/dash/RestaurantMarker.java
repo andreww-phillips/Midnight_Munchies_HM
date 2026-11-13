@@ -1,5 +1,6 @@
 package com.midnightmunchies.domain.dash;
 
+import com.midnightmunchies.domain.geo.MontrealServiceArea;
 import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.RestaurantStatus;
 
@@ -17,7 +18,8 @@ public record RestaurantMarker(
         int queuedCount,
         int preparingCount,
         int readyCount,
-        QueueBand band
+        QueueBand band,
+        String area
 ) implements MapMarker {
 
     public RestaurantMarker {
@@ -44,7 +46,8 @@ public record RestaurantMarker(
                 queued,
                 preparing,
                 ready,
-                QueueBand.of(restaurant.getStatus(), queued)
+                QueueBand.of(restaurant.getStatus(), queued),
+                MontrealServiceArea.areaOf(restaurant.getLatitude(), restaurant.getLongitude())
         );
     }
 }

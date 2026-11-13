@@ -90,6 +90,7 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
         <button className="secondary-button" type="button" onClick={onClose}>Close</button>
       </div>
       <p className="muted">Status: {restaurant.status} · Band: {style.label}</p>
+      {restaurant.area && <p className="details-area">Area: {restaurant.area}</p>}
       <dl className="details-stats">
         <div><dt>Pending</dt><dd>{restaurant.pendingCount}</dd></div>
         <div><dt>Queued</dt><dd>{restaurant.queuedCount}</dd></div>

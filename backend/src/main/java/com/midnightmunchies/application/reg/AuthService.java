@@ -1,5 +1,6 @@
 package com.midnightmunchies.application.reg;
 
+import com.midnightmunchies.domain.geo.MontrealServiceArea;
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
 import com.midnightmunchies.domain.ord.Restaurant;
@@ -46,7 +47,7 @@ public class AuthService {
         try {
             if (role == UserRole.RESTAURANT_STAFF) {
                 UUID ownerId = UUID.fromString(account.id());
-                Restaurant.Position position = Restaurant.defaultPositionFor(ownerId);
+                MontrealServiceArea.Place position = MontrealServiceArea.placeFor(ownerId);
                 restaurants.save(new Restaurant(ownerId, ownerId, name, RestaurantStatus.OPEN,
                         position.latitude(), position.longitude(), restaurantLogo, menu));
             }
