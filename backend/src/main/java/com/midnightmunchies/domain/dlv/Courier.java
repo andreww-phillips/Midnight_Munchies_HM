@@ -36,6 +36,10 @@ public final class Courier {
 		return state;
 	}
 
+	public boolean isOnDuty() {
+		return state != CourierState.OFFLINE;
+	}
+
 	public Optional<Order> getAssignedOrder() {
 		return Optional.ofNullable(assignedOrder);
 	}
@@ -57,6 +61,18 @@ public final class Courier {
 		requireReady(order, "accept an order");
 		assignedOrder = order;
 		state = CourierState.ASSIGNED;
+	}
+
+	/** Releases an accepted order only when the operator explicitly reassigns it. */
+	public void releaseOrder(Order order) {
+		Objects.requireNonNull(order, "order must not be null");
+		requireState(CourierState.ASSIGNED, "release an order");
+		if (!order.getId().equals(assignedOrder.getId())) {
+			throw new IllegalCourierTransitionException(state, "release an order",
+					": order " + order.getId() + " is not assigned to this courier");
+		}
+		assignedOrder = null;
+		state = CourierState.IDLE;
 	}
 
 	public void confirmPickup() {

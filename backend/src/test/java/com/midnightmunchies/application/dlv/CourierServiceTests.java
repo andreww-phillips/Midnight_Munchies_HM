@@ -5,6 +5,7 @@ import com.midnightmunchies.application.ord.OrderTransitions;
 import com.midnightmunchies.domain.dlv.AssignmentStatus;
 import com.midnightmunchies.domain.dlv.Courier;
 import com.midnightmunchies.domain.dlv.CourierState;
+import com.midnightmunchies.domain.dlv.Location;
 import com.midnightmunchies.domain.ord.Actor;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderEvent;
@@ -48,7 +49,7 @@ class CourierServiceTests {
     @Test
     void keepsUnreadyOrdersOutOfOffersAndRetriesQueuedReadyOrdersWhenCourierGoesOnDuty() {
         UserAccount courier = account(UserRole.COURIER);
-        Courier model = new Courier(id(courier));
+        Courier model = new Courier(id(courier), new Location(0, 0));
         couriers.save(model);
         Order order = order(false);
 
@@ -62,7 +63,7 @@ class CourierServiceTests {
         assertEquals(null, service.view(courier).assignment());
 
         CourierService.CourierDashboard dashboard = service.setDuty(courier, true);
-        assertEquals(CourierState.OFFERED, dashboard.state());
+        assertEquals(CourierState.IDLE, dashboard.state());
         assertEquals(AssignmentStatus.OFFERED, dashboard.assignment().assignment().status());
         assertTrue(queue.view().isEmpty());
     }
@@ -88,7 +89,7 @@ class CourierServiceTests {
         assertEquals(id(second), reassigned.assignment().courierId());
         assertEquals(AssignmentStatus.OFFERED, reassigned.assignment().status());
         assertEquals(CourierState.IDLE, service.view(first).state());
-        assertEquals(CourierState.OFFERED, service.view(second).state());
+        assertEquals(CourierState.IDLE, service.view(second).state());
     }
 
     @Test
