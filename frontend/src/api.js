@@ -94,8 +94,8 @@ export const api = {
   deliverOrder: (orderId) => request(`/api/dlv/orders/${orderId}/deliver`, {
     method: "POST"
   }),
-  reassignDelivery: (orderId, courierId) => request(`/api/dlv/orders/${orderId}/reassign`, {
-    method: "POST",
-    body: JSON.stringify(courierId ? { courierId } : {})
-  })
+  reassignDelivery: (orderId) => request(`/api/dlv/orders/${orderId}/reassign`, {
+    method: "POST"
+  }),
+  operatorDeliveries: () => request("/api/dlv/operator/deliveries")
 };

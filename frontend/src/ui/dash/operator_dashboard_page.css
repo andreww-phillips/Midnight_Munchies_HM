@@ -1,0 +1,45 @@
+.operator-dashboard {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.operator-dashboard .section-heading {
+  align-items: flex-start;
+}
+
+.operator-dashboard h3 {
+  margin: 20px 0 8px;
+  color: var(--text-h);
+}
+
+.operator-table-wrap {
+  overflow-x: auto;
+}
+
+.operator-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.operator-table th,
+.operator-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.operator-table td:last-child {
+  text-align: right;
+}
+
+.operator-empty {
+  color: var(--text);
+}
+
+.operator-queue {
+  padding-left: 20px;
+}

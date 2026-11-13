@@ -68,16 +68,34 @@ describe("restaurant order API", () => {
     afterEach(() => vi.unstubAllGlobals());
 
     it("declines an offer with the current courier session", async () => {
-      fetch.mockResolvedValue(new Response(JSON.stringify({ assignment: { status: "REASSIGNED" } }), { status: 200 }));
+      fetch.mockResolvedValue(new Response(JSON.stringify({ assignment: { status: "DECLINED" } }), { status: 200 }));
 
       await expect(api.declineDelivery("order-1")).resolves.toEqual({
-        assignment: { status: "REASSIGNED" }
+        assignment: { status: "DECLINED" }
       });
 
       const [url, options] = fetch.mock.calls[0];
       expect(new URL(url).pathname).toBe("/api/dlv/orders/order-1/decline");
       expect(options.method).toBe("POST");
       expect(options.credentials).toBe("include");
+    });
+
+    it("reassigns a stalled order without choosing a courier", async () => {
+      fetch.mockResolvedValue(new Response(JSON.stringify({ queued: true }), { status: 200 }));
+
+      await expect(api.reassignDelivery("order-1")).resolves.toEqual({ queued: true });
+
+      const [url, options] = fetch.mock.calls[0];
+      expect(new URL(url).pathname).toBe("/api/dlv/orders/order-1/reassign");
+      expect(options.method).toBe("POST");
+      expect(options.body).toBeUndefined();
+    });
+
+    it("loads the operator delivery overview", async () => {
+      fetch.mockResolvedValue(new Response(JSON.stringify({ active: [], queued: [] }), { status: 200 }));
+
+      await expect(api.operatorDeliveries()).resolves.toEqual({ active: [], queued: [] });
+      expect(new URL(fetch.mock.calls[0][0]).pathname).toBe("/api/dlv/operator/deliveries");
     });
   });
 
