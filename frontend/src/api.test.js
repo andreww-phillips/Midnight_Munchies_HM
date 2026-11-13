@@ -43,6 +43,7 @@ describe("restaurant order API", () => {
 
   it.each([
     ["orders", () => api.orders(), "GET", "/api/ord/orders", undefined, []],
+    ["summary", () => api.orderSummary("order-1"), "GET", "/api/prc/orders/order-1/summary", undefined, { orderId: "order-1", totalCharge: null, pricingPending: true }],
     ["queue", () => api.preparationQueue("restaurant-1"), "GET", "/api/ord/restaurants/restaurant-1/preparation", undefined, []],
     ["accept", () => api.acceptOrder("restaurant-1", "order-1"), "POST", "/api/ord/restaurants/restaurant-1/orders/order-1/accept", undefined, { status: "ACCEPTED" }],
     ["reject", () => api.rejectOrder("restaurant-1", "order-1", "Out of fries"), "POST", "/api/ord/restaurants/restaurant-1/orders/order-1/reject", { reason: "Out of fries" }, { status: "REJECTED" }],
@@ -77,6 +78,24 @@ describe("restaurant order API", () => {
       expect(new URL(url).pathname).toBe("/api/dlv/orders/order-1/decline");
       expect(options.method).toBe("POST");
       expect(options.credentials).toBe("include");
+    });
+
+    it("reassigns a stalled order without choosing a courier", async () => {
+      fetch.mockResolvedValue(new Response(JSON.stringify({ queued: true }), { status: 200 }));
+
+      await expect(api.reassignDelivery("order-1")).resolves.toEqual({ queued: true });
+
+      const [url, options] = fetch.mock.calls[0];
+      expect(new URL(url).pathname).toBe("/api/dlv/orders/order-1/reassign");
+      expect(options.method).toBe("POST");
+      expect(options.body).toBeUndefined();
+    });
+
+    it("loads the operator delivery overview", async () => {
+      fetch.mockResolvedValue(new Response(JSON.stringify({ active: [], queued: [] }), { status: 200 }));
+
+      await expect(api.operatorDeliveries()).resolves.toEqual({ active: [], queued: [] });
+      expect(new URL(fetch.mock.calls[0][0]).pathname).toBe("/api/dlv/operator/deliveries");
     });
   });
 

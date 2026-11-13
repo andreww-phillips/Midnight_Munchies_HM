@@ -28,10 +28,18 @@ function DeliveryCard({ assignment, onAction, busy }) {
         ))}
       </ul>
       {action && (
-        <button className="primary-button" type="button" disabled={busy}
-          onClick={() => onAction(action[1], order.id)}>
-          {action[0]}
-        </button>
+        <div className="courier-delivery-actions">
+          <button className="primary-button" type="button" disabled={busy}
+            onClick={() => onAction(action[1], order.id)}>
+            {action[0]}
+          </button>
+          {status === 'OFFERED' && (
+            <button className="secondary-button" type="button" disabled={busy}
+              onClick={() => onAction('decline', order.id)}>
+              Decline offer
+            </button>
+          )}
+        </div>
       )}
       {action?.[2] && (
         <button

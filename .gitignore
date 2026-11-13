@@ -26,6 +26,7 @@ hs_err_pid*
 **/node_modules/
 **/dist/
 **/target/
+backend/data/
 
 .env
 .env.*
@@ -34,3 +35,4 @@ hs_err_pid*
 *.log
 *.local
 replay_pid*
+docs/issue-51-order-ledger.md

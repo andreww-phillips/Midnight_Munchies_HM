@@ -62,6 +62,7 @@ export const api = {
     body: JSON.stringify({ lines })
   }),
   orders: () => request("/api/ord/orders"),
+  orderSummary: (orderId) => request(`/api/prc/orders/${orderId}/summary`),
   preparationQueue: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/preparation`),
   acceptOrder: (restaurantId, orderId) => request(`/api/ord/restaurants/${restaurantId}/orders/${orderId}/accept`, {
     method: "POST"
@@ -94,8 +95,9 @@ export const api = {
   deliverOrder: (orderId) => request(`/api/dlv/orders/${orderId}/deliver`, {
     method: "POST"
   }),
-  reassignDelivery: (orderId, courierId) => request(`/api/dlv/orders/${orderId}/reassign`, {
-    method: "POST",
-    body: JSON.stringify(courierId ? { courierId } : {})
-  })
+  reassignDelivery: (orderId) => request(`/api/dlv/orders/${orderId}/reassign`, {
+    method: "POST"
+  }),
+  operatorDeliveries: () => request("/api/dlv/operator/deliveries"),
+  cityMap: () => request("/api/dash/map")
 };

@@ -1,14 +1,15 @@
 package com.midnightmunchies.technicalservices;
 
-import com.midnightmunchies.domain.dlv.Assignment;
-import org.springframework.stereotype.Repository;
-
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.springframework.stereotype.Repository;
+
+import com.midnightmunchies.domain.dlv.Assignment;
 
 @Repository
 public class AssignmentRepository {
@@ -21,6 +22,13 @@ public class AssignmentRepository {
 
     public Optional<Assignment> findById(UUID id) {
         return Optional.ofNullable(assignments.get(id));
+    }
+
+    public List<Assignment> findActive() {
+        return assignments.values().stream()
+                .filter(Assignment::isActive)
+                .sorted(Comparator.comparing(Assignment::offeredAt))
+                .toList();
     }
 
     public Optional<Assignment> findActiveByOrderId(UUID orderId) {

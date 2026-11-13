@@ -7,7 +7,7 @@ import { api } from '../../../api';
 
 vi.mock('../../../api', () => ({ api: {
   currentUser: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(),
-  restaurants: vi.fn(), orders: vi.fn(), menu: vi.fn(), addMenuItem: vi.fn()
+  restaurants: vi.fn(), orders: vi.fn(), menu: vi.fn(), addMenuItem: vi.fn(), cityMap: vi.fn(), preparationQueue: vi.fn()
 } }));
 
 let container;
@@ -149,4 +149,46 @@ it('preserves menu images and descriptions in the integrated restaurant library'
   expect(container.querySelector('.menu-item img').src).toBe('https://example.com/poutine.png');
   expect(container.textContent).toContain('Fries, Cheese curds');
   expect(button('Add item')).toBeUndefined();
+});
+
+it('offers the map to customers', async () => {
+  api.currentUser.mockResolvedValue({ id: 'customer-1', username: 'customer@example.com', role: 'CUSTOMER' });
+  api.cityMap.mockResolvedValue({ bounds: null, restaurants: [], couriers: [] });
+  await act(async () => root.render(<RegistrationPage />));
+
+  expect(container.querySelector('#restaurant-list')).not.toBeNull();
+  expect(button('Map')).toBeDefined();
+
+  await act(async () => button('Map').click());
+
+  expect(api.cityMap).toHaveBeenCalled();
+  expect(container.querySelector('#restaurant-list')).toBeNull();
+});
+
+it('switches staff to the map view and opens their restaurant orders from the map', async () => {
+  const staff = { id: 'staff-1', username: 'restaurant@example.com', role: 'RESTAURANT_STAFF' };
+  const restaurant = { id: 'r1', ownerId: 'staff-1', name: 'Bobs Burgers' };
+  api.currentUser.mockResolvedValue(staff);
+  api.restaurants.mockResolvedValue([restaurant]);
+  api.menu.mockResolvedValue([]);
+  api.preparationQueue.mockResolvedValue([]);
+  api.cityMap.mockResolvedValue({
+    bounds: { minLat: 45.5, maxLat: 45.5, minLon: -73.5, maxLon: -73.5 },
+    restaurants: [{ ...restaurant, status: 'OPEN', latitude: 45.5, longitude: -73.5,
+      pendingCount: 0, queuedCount: 0, preparingCount: 0, readyCount: 0, band: 'GREEN' }],
+    couriers: []
+  });
+  await act(async () => root.render(<RegistrationPage />));
+
+  expect(button('Restaurants').getAttribute('aria-pressed')).toBe('true');
+  await click(button('Map'));
+  expect(button('Map').getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('#restaurant-list')).toBeNull();
+
+  await act(async () => container.querySelector('.map-restaurant').dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  await click(button('Manage orders'));
+
+  expect(container.querySelector('.city-map')).toBeNull();
+  expect(button('Restaurants').getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('h2').textContent).toBe('Bobs Burgers orders');
 });

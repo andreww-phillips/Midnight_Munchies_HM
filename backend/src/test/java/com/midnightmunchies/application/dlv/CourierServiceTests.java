@@ -11,16 +11,21 @@ import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderEvent;
 import com.midnightmunchies.domain.ord.OrderLine;
 import com.midnightmunchies.domain.ord.OrderStatus;
+import com.midnightmunchies.domain.ord.Restaurant;
+import com.midnightmunchies.domain.ord.RestaurantStatus;
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
 import com.midnightmunchies.technicalservices.AssignmentRepository;
 import com.midnightmunchies.technicalservices.CourierRepository;
 import com.midnightmunchies.technicalservices.InMemoryOrderRepository;
+import com.midnightmunchies.technicalservices.InMemoryRestaurantRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,10 +35,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CourierServiceTests {
+    @TempDir
+    Path tempDir;
+
     private InMemoryOrderRepository orders;
     private CourierRepository couriers;
     private AssignmentRepository assignments;
     private DispatchQueueService queue;
+    private InMemoryRestaurantRepository restaurants;
     private CourierService service;
 
     @BeforeEach
@@ -41,8 +50,9 @@ class CourierServiceTests {
         orders = new InMemoryOrderRepository();
         couriers = new CourierRepository();
         assignments = new AssignmentRepository();
-        queue = new DispatchQueueService();
-        service = new CourierService(couriers, assignments, orders, queue,
+        queue = new DispatchQueueService(tempDir.resolve("dispatch-queue.txt"));
+        restaurants = new InMemoryRestaurantRepository();
+        service = new CourierService(couriers, assignments, orders, restaurants, queue,
                 new OrderTransitions(orders, new OrderEventPublisher()));
     }
 
@@ -85,11 +95,112 @@ class CourierServiceTests {
         assertThrows(com.midnightmunchies.application.ord.AuthorizationException.class,
                 () -> service.accept(second, order.getId()));
 
-        CourierService.AssignmentView reassigned = service.reassign(operator, order.getId(), id(second));
-        assertEquals(id(second), reassigned.assignment().courierId());
-        assertEquals(AssignmentStatus.OFFERED, reassigned.assignment().status());
-        assertEquals(CourierState.IDLE, service.view(first).state());
+        CourierService.ReassignmentView result = service.reassign(operator, order.getId());
+
+        assertFalse(result.queued());
+        assertEquals(id(second), result.replacement().courierId());
+        assertEquals(AssignmentStatus.OFFERED, result.replacement().status());
+        assertEquals(AssignmentStatus.REASSIGNED, result.previous().status());
+        assertEquals(operator.id(), result.previous().releasedBy());
+        assertEquals(CourierState.OFFLINE, service.view(first).state());
         assertEquals(CourierState.IDLE, service.view(second).state());
+        assertEquals(OrderStatus.READY, orders.findById(order.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
+    void reassignmentOffersTheOrderToTheNearestOtherIdleCourier() {
+        Restaurant restaurant = restaurants.save(new Restaurant(UUID.randomUUID(), "Reassign " + UUID.randomUUID(),
+                RestaurantStatus.OPEN, 45.50, -73.57));
+        UserAccount stalled = account(UserRole.COURIER);
+        couriers.save(new Courier(id(stalled), new Location(45.50, -73.57)));
+        service.setDuty(stalled, true);
+        Order order = order(true, restaurant.getId());
+        service.onEvent(event(order, OrderStatus.PREPARING, OrderStatus.READY));
+        service.accept(stalled, order.getId());
+
+        UserAccount far = account(UserRole.COURIER);
+        UserAccount near = account(UserRole.COURIER);
+        couriers.save(new Courier(id(far), new Location(45.60, -73.70)));
+        couriers.save(new Courier(id(near), new Location(45.51, -73.58)));
+        service.setDuty(far, true);
+        service.setDuty(near, true);
+
+        CourierService.ReassignmentView result = service.reassign(account(UserRole.PLATFORM_OPERATOR), order.getId());
+
+        assertEquals(id(near), result.replacement().courierId());
+    }
+
+    @Test
+    void reassignmentQueuesTheOrderWhenNoOtherCourierIsIdle() {
+        UserAccount stalled = account(UserRole.COURIER);
+        service.setDuty(stalled, true);
+        Order order = order(true);
+        service.onEvent(event(order, OrderStatus.PREPARING, OrderStatus.READY));
+
+        CourierService.ReassignmentView result = service.reassign(account(UserRole.PLATFORM_OPERATOR), order.getId());
+
+        assertTrue(result.queued());
+        assertEquals(null, result.replacement());
+        assertEquals(List.of(order.getId()), queue.view());
+        assertEquals(CourierState.OFFLINE, service.view(stalled).state());
+        assertTrue(assignments.findActiveByOrderId(order.getId()).isEmpty());
+
+        UserAccount next = account(UserRole.COURIER);
+        service.setDuty(next, true);
+        assertEquals(id(next), assignments.findActiveByOrderId(order.getId()).orElseThrow().courierId());
+        assertTrue(queue.view().isEmpty());
+    }
+
+    @Test
+    void onlyOperatorsCanReassignAndPickedUpOrdersCannotBeReassigned() {
+        UserAccount courier = account(UserRole.COURIER);
+        service.setDuty(courier, true);
+        Order order = order(true);
+        service.onEvent(event(order, OrderStatus.PREPARING, OrderStatus.READY));
+        service.accept(courier, order.getId());
+
+        assertThrows(com.midnightmunchies.application.ord.AuthorizationException.class,
+                () -> service.reassign(courier, order.getId()));
+        assertThrows(com.midnightmunchies.application.ord.AuthorizationException.class,
+                () -> service.reassign(account(UserRole.RESTAURANT_STAFF), order.getId()));
+        assertThrows(com.midnightmunchies.application.reg.AuthenticationRequiredException.class,
+                () -> service.reassign(null, order.getId()));
+
+        service.pickUp(courier, order.getId());
+        assertThrows(DeliveryConflictException.class,
+                () -> service.reassign(account(UserRole.PLATFORM_OPERATOR), order.getId()));
+        assertEquals(CourierState.CARRYING, service.view(courier).state());
+    }
+
+    @Test
+    void reassigningAnOrderWithoutActiveAssignmentIsNotFound() {
+        Order order = order(true);
+
+        assertThrows(DeliveryNotFoundException.class,
+                () -> service.reassign(account(UserRole.PLATFORM_OPERATOR), order.getId()));
+    }
+
+    @Test
+    void operatorSeesActiveDeliveriesAndQueuedOrders() {
+        UserAccount courier = account(UserRole.COURIER);
+        service.setDuty(courier, true);
+        Order offered = order(true);
+        Order waiting = order(true);
+        service.onEvent(event(offered, OrderStatus.PREPARING, OrderStatus.READY));
+        service.onEvent(event(waiting, OrderStatus.PREPARING, OrderStatus.READY));
+
+        CourierService.OperatorDeliveriesView view = service.operatorDeliveries(account(UserRole.PLATFORM_OPERATOR));
+
+        assertEquals(1, view.active().size());
+        CourierService.ActiveDeliveryView row = view.active().get(0);
+        assertEquals(offered.getId(), row.orderId());
+        assertEquals(id(courier), row.courierId());
+        assertEquals(AssignmentStatus.OFFERED, row.status());
+        assertTrue(row.reassignable());
+        assertTrue(row.waitingSeconds() >= 0);
+        assertEquals(List.of(waiting.getId()), view.queued());
+        assertThrows(com.midnightmunchies.application.ord.AuthorizationException.class,
+                () -> service.operatorDeliveries(courier));
     }
 
     @Test
@@ -131,8 +242,57 @@ class CourierServiceTests {
         assertFalse(queue.view().contains(second.getId()));
     }
 
+    @Test
+    void declinedOfferIsRetriedForAnotherIdleCourierAndRemainsQueuedOtherwise() {
+        UserAccount declining = account(UserRole.COURIER);
+        UserAccount nextCourier = account(UserRole.COURIER);
+        Order order = order(true);
+        service.setDuty(declining, true);
+        service.onEvent(event(order, OrderStatus.PREPARING, OrderStatus.READY));
+        service.setDuty(nextCourier, true);
+
+        service.decline(declining, order.getId());
+
+        assertEquals(id(nextCourier),
+                assignments.findActiveByOrderId(order.getId()).orElseThrow().courierId());
+        assertTrue(queue.view().isEmpty());
+        assertEquals(CourierState.IDLE, service.view(declining).state());
+    }
+
+    @Test
+    void readyOrderIsOfferedToTheNearestIdleCourier() {
+        Restaurant restaurant = restaurants.save(new Restaurant(UUID.randomUUID(), "Dispatch " + UUID.randomUUID(),
+                RestaurantStatus.OPEN, 45.50, -73.57));
+        UserAccount far = account(UserRole.COURIER);
+        UserAccount near = account(UserRole.COURIER);
+        couriers.save(new Courier(id(far), new Location(45.60, -73.70)));
+        couriers.save(new Courier(id(near), new Location(45.51, -73.58)));
+        service.setDuty(far, true);
+        service.setDuty(near, true);
+
+        Order order = order(true, restaurant.getId());
+        service.onEvent(event(order, OrderStatus.PREPARING, OrderStatus.READY));
+
+        assertEquals(id(near), assignments.findActiveByOrderId(order.getId()).orElseThrow().courierId());
+    }
+
+    @Test
+    void newCouriersStartInsideTheCityInsteadOfAtTheOrigin() {
+        UserAccount courier = account(UserRole.COURIER);
+
+        service.setDuty(courier, true);
+
+        Location location = couriers.findById(id(courier)).orElseThrow().getLocation();
+        assertTrue(Math.abs(location.latitude() - 45.5017) < 0.02);
+        assertTrue(Math.abs(location.longitude() + 73.5673) < 0.02);
+    }
+
     private Order order(boolean isReady) {
-        Order order = new Order(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+        return order(isReady, UUID.randomUUID());
+    }
+
+    private Order order(boolean isReady, UUID restaurantId) {
+        Order order = new Order(UUID.randomUUID(), UUID.randomUUID(), restaurantId,
                 List.of(new OrderLine(UUID.randomUUID(), 1, new BigDecimal("8.50"))), Instant.now());
         if (isReady) {
             ready(order);

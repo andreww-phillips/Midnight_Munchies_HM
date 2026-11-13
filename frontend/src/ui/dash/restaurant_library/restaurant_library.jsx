@@ -6,7 +6,7 @@ import OrderHistory from '../order_history.jsx';
 import RestaurantDashboard from '../restaurant_dashboard/restaurant_dashboard.jsx';
 import './restaurant_library.css';
 
-export default function RestaurantList({ user, onSessionExpired }) {
+export default function RestaurantList({ user, onSessionExpired, initialOpen = null }) {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -14,14 +14,24 @@ export default function RestaurantList({ user, onSessionExpired }) {
   const [selectedView, setSelectedView] = useState('menu');
   const [ordersVersion, setOrdersVersion] = useState(0);
 
+  const [pendingOpen] = useState(initialOpen);
+
   useEffect(() => {
     let active = true;
     api.restaurants()
-      .then((items) => { if (active) setRestaurants(items); })
+      .then((items) => {
+        if (!active) return;
+        setRestaurants(items);
+        const match = pendingOpen && items.find((restaurant) => restaurant.id === pendingOpen.restaurantId);
+        if (match) {
+          setSelectedView(pendingOpen.view ?? 'menu');
+          setSelectedRestaurant(match);
+        }
+      })
       .catch((loadError) => { if (active) setError(loadError.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [pendingOpen]);
 
   const openRestaurant = (restaurant, view = 'menu') => {
     setSelectedView(view);
@@ -71,7 +81,7 @@ export default function RestaurantList({ user, onSessionExpired }) {
             </section>
           </>
         )}
-        {user?.role !== 'COURIER' && !(selectedRestaurant && selectedView === 'orders') && <OrderHistory refreshVersion={ordersVersion} />}
+        {user?.role !== 'COURIER' && !(selectedRestaurant && selectedView === 'orders') && <OrderHistory refreshVersion={ordersVersion} user={user} />}
       </main>
       <footer><p>&copy; 2023 Midnight Munchies. All rights reserved.</p></footer>
     </>

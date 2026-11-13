@@ -47,8 +47,12 @@ menu management, or ordering.
 
 The backend defaults to `catalog.mode=memory` and seeds the local restaurant and
 menu catalog. Accounts, restaurants, menus and orders live for the lifetime of
-the backend process and reset when it restarts. The frontend uses the backend
-API at `http://localhost:8080`; `VITE_API_URL` can override that address if needed.
+the backend process and reset when it restarts. Ready orders waiting for a
+courier are the exception: DLV stores their FIFO queue and order snapshots in
+`backend/data/dlv-dispatch-queue.txt` so they can be restored after a backend
+restart. Set `DLV_DISPATCH_QUEUE_FILE` to change that location. The frontend
+uses the backend API at `http://localhost:8080`; `VITE_API_URL` can override
+that address if needed.
 
 ### Terminal 1: Backend
 
@@ -141,7 +145,9 @@ the shared Supabase database. Frontend tests mock backend API calls.
 
 Other demo logins are `courier@example.com` and `operator@example.com`, both with
 password `password`. Couriers can browse; menu management is restricted to owning
-restaurant staff. All simulator changes reset when the backend restarts.
+restaurant staff. Accounts, restaurants, menus, and orders reset when the
+backend restarts; ready orders still awaiting courier assignment are restored
+from the dispatch queue file.
 
 See [the issue 7 integration notes](docs/issue-7-integration.md) for the exact
 regression history and current implementation.
