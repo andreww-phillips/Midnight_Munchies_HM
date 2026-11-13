@@ -16,5 +16,9 @@ interface OrderState {
 
 	OrderState markReady();
 
+	OrderState confirmPickup();
+
+	OrderState confirmDelivery();
+
 	OrderState cancel();
 }
