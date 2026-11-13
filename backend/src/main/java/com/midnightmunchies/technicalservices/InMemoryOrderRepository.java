@@ -14,7 +14,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Repository
-public class InMemoryOrderRepository implements OrderRepository {
+public class InMemoryOrderRepository implements OrderRepository, SimulatorStore {
 
 	private final Map<UUID, Order> orders = new ConcurrentHashMap<>();
 
@@ -60,5 +60,10 @@ public class InMemoryOrderRepository implements OrderRepository {
 				.filter(order -> order.getAcceptedAt() != null)
 				.sorted(Comparator.comparing(Order::getAcceptedAt).thenComparing(Order::getId))
 				.toList();
+	}
+
+	@Override
+	public synchronized void clear() {
+		orders.clear();
 	}
 }

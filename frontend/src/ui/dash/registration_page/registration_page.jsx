@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import RestaurantList from "../restaurant_library/restaurant_library.jsx";
+import Dashboard from "../dashboard/dashboard.jsx";
 import { api } from "../../../api";
 import { useCommandLog } from "../output_console/command_log";
 import { CommandLogProvider } from "../output_console/command_log_provider";
@@ -174,12 +174,11 @@ function RegistrationScreen() {
           <div>
             <p className="eyebrow">MIDNIGHT MUNCHIES</p>
             <h1>Welcome, {user.username}</h1>
-            <p className="muted">Role: {user.role}</p>
           </div>
           <button className="secondary-button" type="button" disabled={isSubmitting} onClick={handleLogout}>Log out</button>
         </header>
         {error && <p role="alert">{error}</p>}
-        <RestaurantList key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleSessionExpired} />
+        <Dashboard key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleSessionExpired} />
         <OutputConsole />
       </div>
     );

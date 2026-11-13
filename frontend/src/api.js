@@ -76,5 +76,9 @@ export const api = {
   markOrderReady: (restaurantId, orderId) => request(`/api/ord/restaurants/${restaurantId}/orders/${orderId}/ready`, {
     method: "POST"
   }),
-  orderEvents: (orderId) => request(`/api/ord/orders/${orderId}/events`)
+  orderEvents: (orderId) => request(`/api/ord/orders/${orderId}/events`),
+  cityMap: () => request("/api/dash/map"),
+  pauseRestaurant: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/pause`, { method: "POST" }),
+  reopenRestaurant: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/reopen`, { method: "POST" }),
+  resetSimulation: () => request("/api/operator/reset", { method: "POST" })
 };

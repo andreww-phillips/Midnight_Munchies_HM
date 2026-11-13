@@ -6,6 +6,20 @@ import java.util.UUID;
 /** A restaurant; menu items and orders refer to its ID rather than owned collections. */
 public final class Restaurant {
 
+	public static final double CITY_CENTER_LATITUDE = 45.5017;
+	public static final double CITY_CENTER_LONGITUDE = -73.5673;
+
+	public record Position(double latitude, double longitude) {
+	}
+
+	public static Position defaultPositionFor(UUID id) {
+		Objects.requireNonNull(id, "id must not be null");
+		double angle = Math.toRadians(Math.floorMod(id.hashCode(), 360));
+		double radius = 0.008 + Math.floorMod(id.getLeastSignificantBits(), 8) * 0.001;
+		return new Position(CITY_CENTER_LATITUDE + radius * Math.sin(angle),
+				CITY_CENTER_LONGITUDE + radius * Math.cos(angle));
+	}
+
 	private final UUID id;
 	private final UUID ownerId;
 	private final String name;
@@ -68,4 +82,8 @@ public final class Restaurant {
 	public String getLogo() { return logo; }
 
 	public String getMenu() { return menu; }
+
+	public Restaurant withStatus(RestaurantStatus newStatus) {
+		return new Restaurant(id, ownerId, name, newStatus, latitude, longitude, logo, menu);
+	}
 }

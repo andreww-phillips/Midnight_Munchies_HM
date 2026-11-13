@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InMemoryRestaurantRepository implements RestaurantRepository {
+public class InMemoryRestaurantRepository implements RestaurantRepository, SimulatorStore {
 
 	private final Map<UUID, Restaurant> restaurants = new ConcurrentHashMap<>();
 
@@ -31,5 +31,10 @@ public class InMemoryRestaurantRepository implements RestaurantRepository {
 	@Override
 	public List<Restaurant> findAll() {
 		return List.copyOf(restaurants.values());
+	}
+
+	@Override
+	public synchronized void clear() {
+		restaurants.clear();
 	}
 }
