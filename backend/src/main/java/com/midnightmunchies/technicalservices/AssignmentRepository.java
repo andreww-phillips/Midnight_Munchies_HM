@@ -23,6 +23,13 @@ public class AssignmentRepository {
         return Optional.ofNullable(assignments.get(id));
     }
 
+    public List<Assignment> findActive() {
+        return assignments.values().stream()
+                .filter(Assignment::isActive)
+                .sorted(Comparator.comparing(Assignment::offeredAt))
+                .toList();
+    }
+
     public Optional<Assignment> findActiveByOrderId(UUID orderId) {
         return assignments.values().stream()
                 .filter(Assignment::isActive)

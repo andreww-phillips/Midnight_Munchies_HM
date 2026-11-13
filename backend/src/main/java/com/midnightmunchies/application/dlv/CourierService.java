@@ -5,6 +5,7 @@ import com.midnightmunchies.domain.dlv.Assignment;
 import com.midnightmunchies.domain.dlv.AssignmentStatus;
 import com.midnightmunchies.domain.dlv.Courier;
 import com.midnightmunchies.domain.dlv.CourierState;
+import com.midnightmunchies.domain.dlv.DispatchRule;
 import com.midnightmunchies.domain.dlv.Location;
 import com.midnightmunchies.domain.ord.Actor;
 import com.midnightmunchies.domain.ord.Order;
@@ -12,6 +13,7 @@ import com.midnightmunchies.domain.ord.OrderEvent;
 import com.midnightmunchies.domain.ord.OrderEventListener;
 import com.midnightmunchies.domain.ord.OrderRepository;
 import com.midnightmunchies.domain.ord.OrderStatus;
+import com.midnightmunchies.domain.ord.RestaurantRepository;
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
 import com.midnightmunchies.technicalservices.AssignmentRepository;
@@ -22,9 +24,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -32,16 +37,18 @@ public class CourierService implements OrderEventListener {
     private final CourierRepository couriers;
     private final AssignmentRepository assignments;
     private final OrderRepository orders;
+    private final RestaurantRepository restaurants;
     private final DispatchQueueService dispatchQueue;
     private final OrderTransitions transitions;
     private final Clock clock;
+    private final DispatchRule dispatchRule = new DispatchRule();
     private final Object dispatchLock = new Object();
 
     @Autowired
     public CourierService(CourierRepository couriers, AssignmentRepository assignments,
-                          OrderRepository orders, DispatchQueueService dispatchQueue,
-                          OrderTransitions transitions) {
-        this(couriers, assignments, orders, dispatchQueue, transitions, Clock.systemUTC());
+                          OrderRepository orders, RestaurantRepository restaurants,
+                          DispatchQueueService dispatchQueue, OrderTransitions transitions) {
+        this(couriers, assignments, orders, restaurants, dispatchQueue, transitions, Clock.systemUTC());
     }
 
     public AssignmentView decline(UserAccount account, UUID orderId) {
@@ -50,17 +57,19 @@ public class CourierService implements OrderEventListener {
             Assignment assignment = requireAssignment(orderId, identity.getId(), AssignmentStatus.OFFERED);
             Order order = findReadyOrder(orderId);
             dispatchQueue.enqueue(order);
-            Assignment declined = assignments.save(assignment.reassign());
+            Assignment declined = assignments.save(assignment.decline(clock.instant()));
             retryDispatch(identity.getId());
             return new AssignmentView(declined, order);
         }
     }
 
     CourierService(CourierRepository couriers, AssignmentRepository assignments, OrderRepository orders,
-                   DispatchQueueService dispatchQueue, OrderTransitions transitions, Clock clock) {
+                   RestaurantRepository restaurants, DispatchQueueService dispatchQueue,
+                   OrderTransitions transitions, Clock clock) {
         this.couriers = Objects.requireNonNull(couriers, "couriers must not be null");
         this.assignments = Objects.requireNonNull(assignments, "assignments must not be null");
         this.orders = Objects.requireNonNull(orders, "orders must not be null");
+        this.restaurants = Objects.requireNonNull(restaurants, "restaurants must not be null");
         this.dispatchQueue = Objects.requireNonNull(dispatchQueue, "dispatchQueue must not be null");
         this.transitions = Objects.requireNonNull(transitions, "transitions must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
@@ -94,7 +103,7 @@ public class CourierService implements OrderEventListener {
                                 .filter(order -> order.getStatus() == OrderStatus.READY)
                                 .ifPresent(order -> {
                                     dispatchQueue.enqueue(order);
-                                    assignments.save(assignment.reassign());
+                                    assignments.save(assignment.decline(clock.instant()));
                                 });
                     });
                     courier.goOffDuty();
@@ -167,52 +176,51 @@ public class CourierService implements OrderEventListener {
         }
     }
 
-    public AssignmentView reassign(UserAccount account, UUID orderId, UUID newCourierId) {
-        requireOperator(account);
+    public ReassignmentView reassign(UserAccount account, UUID orderId) {
+        String operatorId = requireOperator(account);
         synchronized (dispatchLock) {
             Order order = orders.findById(orderId)
                     .orElseThrow(() -> new DeliveryNotFoundException("Order does not exist"));
-            if (order.getStatus() != OrderStatus.READY) {
-                throw new DeliveryConflictException("Only a ready order can be reassigned");
-            }
             Assignment previous = findActiveAssignment(orderId);
-            if (previous.status() == AssignmentStatus.PICKED_UP) {
-                throw new DeliveryConflictException("A picked-up order cannot be reassigned");
+            if (order.getStatus() != OrderStatus.READY || previous.status() == AssignmentStatus.PICKED_UP) {
+                throw new DeliveryConflictException("Only a ready order that has not been picked up can be reassigned");
             }
-            Courier oldCourier = findOrCreate(previous.courierId());
-            Courier newCourier = newCourierId == null ? null : findOrCreate(newCourierId);
-            if (newCourier != null && (!newCourier.isOnDuty()
-                    || (newCourier.getState() != CourierState.IDLE
-                    && !newCourier.getId().equals(oldCourier.getId()))
-                    || assignments.findActiveByCourierId(newCourier.getId())
-                    .filter(assignment -> !assignment.orderId().equals(orderId)).isPresent())) {
-                throw new DeliveryConflictException("The selected courier is not idle and on duty");
-            }
-
-            if (newCourier != null) {
+            Courier stalled = findOrCreate(previous.courierId());
+            try {
                 if (previous.status() == AssignmentStatus.ACCEPTED) {
-                    oldCourier.releaseOrder(order);
+                    stalled.releaseOrder(order);
                 }
-                couriers.save(oldCourier);
-                assignments.save(previous.reassign());
-                dispatchQueue.remove(orderId);
-                couriers.save(newCourier);
-                Assignment replacement = assignments.save(Assignment.offer(orderId, newCourier.getId(), clock.instant()));
-                retryDispatch(null);
-                return new AssignmentView(replacement, order);
+                if (stalled.getState() == CourierState.IDLE) {
+                    stalled.goOffDuty();
+                }
+            } catch (IllegalStateException exception) {
+                throw new DeliveryConflictException(exception.getMessage());
             }
-
+            couriers.save(stalled);
+            Assignment released = assignments.save(previous.reassign(operatorId, clock.instant()));
             dispatchQueue.enqueue(order);
-            if (previous.status() == AssignmentStatus.ACCEPTED) {
-                oldCourier.releaseOrder(order);
-            }
-            couriers.save(oldCourier);
-            assignments.save(previous.reassign());
             retryDispatch(null);
-            return assignments.findActiveByOrderId(orderId)
-                    .map(this::assignmentView)
-                    .orElse(new AssignmentView(null, order));
+            Assignment replacement = assignments.findActiveByOrderId(orderId).orElse(null);
+            return new ReassignmentView(released, replacement, order, replacement == null);
         }
+    }
+
+    public OperatorDeliveriesView operatorDeliveries(UserAccount account) {
+        requireOperator(account);
+        synchronized (dispatchLock) {
+            Instant now = clock.instant();
+            List<ActiveDeliveryView> active = assignments.findActive().stream()
+                    .map(assignment -> activeDelivery(assignment, now))
+                    .toList();
+            return new OperatorDeliveriesView(active, dispatchQueue.view());
+        }
+    }
+
+    private ActiveDeliveryView activeDelivery(Assignment assignment, Instant now) {
+        Instant since = assignment.acceptedAt() != null ? assignment.acceptedAt() : assignment.offeredAt();
+        return new ActiveDeliveryView(assignment.orderId(), assignment.courierId(), assignment.status(),
+                assignment.offeredAt(), assignment.acceptedAt(), Duration.between(since, now).toSeconds(),
+                assignment.status() != AssignmentStatus.PICKED_UP);
     }
 
     public List<UUID> dispatchQueue() {
@@ -238,15 +246,8 @@ public class CourierService implements OrderEventListener {
     }
 
     private void retryDispatch(UUID excludedCourierId) {
+        Set<UUID> excluded = excludedCourierId == null ? Set.of() : Set.of(excludedCourierId);
         while (true) {
-            Optional<Courier> idleCourier = couriers.findAll().stream()
-                    .filter(courier -> courier.getState() == CourierState.IDLE)
-                    .filter(courier -> assignments.findActiveByCourierId(courier.getId()).isEmpty())
-                    .filter(courier -> !courier.getId().equals(excludedCourierId))
-                    .findFirst();
-            if (idleCourier.isEmpty()) {
-                return;
-            }
             Optional<UUID> nextOrderId = dispatchQueue.peek();
             if (nextOrderId.isEmpty()) {
                 return;
@@ -261,10 +262,24 @@ public class CourierService implements OrderEventListener {
                 dispatchQueue.remove(orderId);
                 continue;
             }
-            Courier courier = idleCourier.get();
-            assignments.save(Assignment.offer(orderId, courier.getId(), clock.instant()));
+            Optional<Courier> courier = selectCourier(readyOrder.get(), excluded);
+            if (courier.isEmpty()) {
+                return;
+            }
+            assignments.save(Assignment.offer(orderId, courier.get().getId(), clock.instant()));
             dispatchQueue.remove(orderId);
         }
+    }
+
+    private Optional<Courier> selectCourier(Order order, Set<UUID> excluded) {
+        List<Courier> eligible = couriers.findAll().stream()
+                .filter(courier -> !excluded.contains(courier.getId()))
+                .filter(courier -> assignments.findActiveByCourierId(courier.getId()).isEmpty())
+                .toList();
+        return restaurants.findById(order.getRestaurantId())
+                .map(restaurant -> new Location(restaurant.getLatitude(), restaurant.getLongitude()))
+                .map(pickup -> dispatchRule.nearest(pickup, eligible))
+                .orElseGet(() -> dispatchRule.lowestId(eligible));
     }
 
     private void restoreQueuedOrders() {
@@ -326,11 +341,12 @@ public class CourierService implements OrderEventListener {
         return findOrCreate(userId(user));
     }
 
-    private void requireOperator(UserAccount account) {
+    private String requireOperator(UserAccount account) {
         UserAccount user = requireAuthenticated(account);
         if (user.role() != UserRole.PLATFORM_OPERATOR) {
-            throw new AuthorizationException("Only platform operators can reassign deliveries");
+            throw new AuthorizationException("Only platform operators can manage deliveries");
         }
+        return user.id();
     }
 
     private UserAccount requireAuthenticated(UserAccount account) {
@@ -352,5 +368,15 @@ public class CourierService implements OrderEventListener {
     }
 
     public record AssignmentView(Assignment assignment, Order order) {
+    }
+
+    public record ActiveDeliveryView(UUID orderId, UUID courierId, AssignmentStatus status, Instant offeredAt,
+                                     Instant acceptedAt, long waitingSeconds, boolean reassignable) {
+    }
+
+    public record OperatorDeliveriesView(List<ActiveDeliveryView> active, List<UUID> queued) {
+    }
+
+    public record ReassignmentView(Assignment previous, Assignment replacement, Order order, boolean queued) {
     }
 }
