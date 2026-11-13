@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../../api';
 import { useCommandLog } from '../output_console/command_log';
 import { bandStyle } from './map_bands';
+import RestaurantDeliveries from './restaurant_deliveries';
 
 const STAGES = ['PLACED', 'ACCEPTED', 'PREPARING', 'READY'];
 
@@ -15,7 +16,7 @@ function activeQueue(orders, restaurantId) {
 
 function canSeeQueue(user, restaurant) {
   if (user?.role === 'PLATFORM_OPERATOR') return true;
-  return user?.role === 'RESTAURANT_STAFF' && Boolean(user.id) && restaurant.ownerId === user.id;
+  return user?.role === 'RESTAURANT_STAFF' && restaurant.ownedByViewer === true;
 }
 
 function quickActions(user, restaurant) {
@@ -121,6 +122,13 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
             </ol>
           )}
         </div>
+      )}
+      {user?.role === 'PLATFORM_OPERATOR' && (
+        <RestaurantDeliveries
+          orderIds={queue.filter((order) => order.status === 'READY').map((order) => order.id)}
+          refreshKey={countsKey}
+          onSessionExpired={onSessionExpired}
+        />
       )}
       {actions.length > 0 && onOpenRestaurant && (
         <div className="details-actions">

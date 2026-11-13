@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public record RestaurantMarker(
         UUID id,
-        UUID ownerId,
+        boolean ownedByViewer,
         String name,
         RestaurantStatus status,
         double latitude,
@@ -30,11 +30,12 @@ public record RestaurantMarker(
         }
     }
 
-    public static RestaurantMarker from(Restaurant restaurant, int pending, int queued, int preparing, int ready) {
+    public static RestaurantMarker from(Restaurant restaurant, boolean ownedByViewer, int pending, int queued,
+                                        int preparing, int ready) {
         Objects.requireNonNull(restaurant, "restaurant must not be null");
         return new RestaurantMarker(
                 restaurant.getId(),
-                restaurant.getOwnerId(),
+                ownedByViewer,
                 restaurant.getName(),
                 restaurant.getStatus(),
                 restaurant.getLatitude(),

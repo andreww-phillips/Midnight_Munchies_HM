@@ -8,11 +8,11 @@ import { useCommandLog } from '../output_console/command_log';
 import OutputConsole from '../output_console/output_console';
 import MapPage from './map_page';
 
-vi.mock('../../../api', () => ({ api: { cityMap: vi.fn(), orders: vi.fn(), menu: vi.fn() } }));
+vi.mock('../../../api', () => ({ api: { cityMap: vi.fn(), orders: vi.fn(), menu: vi.fn(), operatorDeliveries: vi.fn() } }));
 
 const courier = { id: 'courier-1', role: 'COURIER', username: 'courier@example.com' };
 const marker = (overrides) => ({
-  id: 'r1', ownerId: 'staff-1', name: 'Bobs Burgers', status: 'OPEN', latitude: 45.5048, longitude: -73.5772,
+  id: 'r1', name: 'Bobs Burgers', status: 'OPEN', latitude: 45.5048, longitude: -73.5772,
   pendingCount: 0, queuedCount: 2, preparingCount: 0, readyCount: 0, band: 'GREEN', ...overrides
 });
 const cityMap = (restaurants, couriers = []) => ({
@@ -45,6 +45,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   api.orders.mockResolvedValue([]);
   api.menu.mockResolvedValue([]);
+  api.operatorDeliveries.mockResolvedValue({ active: [], queued: [] });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -89,6 +90,26 @@ describe('city map', () => {
 
     const alerts = [...container.querySelectorAll('.map-alert li')].map((element) => element.textContent);
     expect(alerts).toEqual(['Pizza Palace: 6 queued', 'Paused Diner: PAUSED']);
+  });
+
+  it('lists orders waiting for a courier to the operator', async () => {
+    api.cityMap.mockResolvedValue({ ...cityMap([marker()]), awaitingCourier: [
+      { orderId: 'aaaaaaaa-0000', restaurantId: 'r1', restaurantName: 'Bobs Burgers' },
+      { orderId: 'bbbbbbbb-0000', restaurantId: 'r9', restaurantName: null }
+    ] });
+    await render({ user: { id: 'operator-1', role: 'PLATFORM_OPERATOR' } });
+
+    const waiting = [...container.querySelectorAll('.map-waiting li')].map((element) => element.textContent);
+    expect(waiting).toEqual(['Order #aaaaaaaa · Bobs Burgers', 'Order #bbbbbbbb · Unknown restaurant']);
+  });
+
+  it('does not list waiting orders to other roles', async () => {
+    api.cityMap.mockResolvedValue({ ...cityMap([marker()]), awaitingCourier: [
+      { orderId: 'aaaaaaaa-0000', restaurantId: 'r1', restaurantName: 'Bobs Burgers' }
+    ] });
+    await render();
+
+    expect(container.querySelector('.map-waiting')).toBeNull();
   });
 
   it('does not alert the operator when no restaurant is red', async () => {

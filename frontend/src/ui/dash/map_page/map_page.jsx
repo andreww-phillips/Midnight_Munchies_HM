@@ -4,6 +4,7 @@ import { useCommandLog } from '../output_console/command_log';
 import { MAP_SIZE, paddedBounds, project } from './map_geometry';
 import { BAND_STYLES, COURIER_STYLES, bandStyle, courierStyle, markerLabel } from './map_bands';
 import RestaurantDetails from './restaurant_details';
+import { shortId } from '../operator_format';
 import './map_page.css';
 
 const GRID_LINES = [0.25, 0.5, 0.75];
@@ -121,7 +122,9 @@ export default function MapPage({ user, onSessionExpired, onOpenRestaurant, poll
   const bounds = paddedBounds(cityMap?.bounds);
   const isEmpty = Boolean(cityMap) && (!bounds || (restaurants.length === 0 && couriers.length === 0));
   const selected = restaurants.find((restaurant) => restaurant.id === selectedId) ?? null;
-  const alerts = user?.role === 'PLATFORM_OPERATOR' ? restaurants.filter((restaurant) => restaurant.band === 'RED') : [];
+  const isOperator = user?.role === 'PLATFORM_OPERATOR';
+  const alerts = isOperator ? restaurants.filter((restaurant) => restaurant.band === 'RED') : [];
+  const waiting = isOperator ? (cityMap?.awaitingCourier ?? []) : [];
 
   return (
     <section className="city-map" aria-label="City map">
@@ -143,6 +146,16 @@ export default function MapPage({ user, onSessionExpired, onOpenRestaurant, poll
               <li key={restaurant.id}>
                 {restaurant.name}: {restaurant.status === 'OPEN' ? `${restaurant.queuedCount} queued` : restaurant.status}
               </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {waiting.length > 0 && (
+        <section className="map-alert map-waiting" aria-label="Orders waiting for a courier">
+          <strong>Orders waiting for a courier</strong>
+          <ul>
+            {waiting.map((order) => (
+              <li key={order.orderId}>Order #{shortId(order.orderId)} · {order.restaurantName ?? 'Unknown restaurant'}</li>
             ))}
           </ul>
         </section>

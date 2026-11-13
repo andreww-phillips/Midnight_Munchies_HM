@@ -61,6 +61,6 @@ class CityMapTests {
 
     private static RestaurantMarker marker(RestaurantStatus status, double latitude, double longitude, int queued) {
         Restaurant restaurant = new Restaurant(UUID.randomUUID(), "Diner", status, latitude, longitude);
-        return RestaurantMarker.from(restaurant, 0, queued, 0, 0);
+        return RestaurantMarker.from(restaurant, false, 0, queued, 0, 0);
     }
 }
