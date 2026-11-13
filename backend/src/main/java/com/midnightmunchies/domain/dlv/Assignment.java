@@ -38,7 +38,7 @@ public record Assignment(
     public Assignment decline(Instant at) {
         requireStatus(AssignmentStatus.OFFERED);
         return new Assignment(id, orderId, courierId, AssignmentStatus.DECLINED, offeredAt,
-                null, null, null);
+                null, null, null, Objects.requireNonNull(at, "at must not be null"), courierId.toString());
     }
 
     public Assignment pickUp(Instant at) {
@@ -51,12 +51,6 @@ public record Assignment(
         requireStatus(AssignmentStatus.PICKED_UP);
         return new Assignment(id, orderId, courierId, AssignmentStatus.DELIVERED, offeredAt,
                 acceptedAt, pickedUpAt, Objects.requireNonNull(at, "at must not be null"), null, null);
-    }
-
-    public Assignment decline(Instant at) {
-        requireStatus(AssignmentStatus.OFFERED);
-        return new Assignment(id, orderId, courierId, AssignmentStatus.DECLINED, offeredAt,
-                null, null, null, Objects.requireNonNull(at, "at must not be null"), courierId.toString());
     }
 
     public Assignment reassign(String operatorId, Instant at) {

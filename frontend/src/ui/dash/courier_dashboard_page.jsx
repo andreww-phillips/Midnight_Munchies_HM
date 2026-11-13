@@ -33,23 +33,13 @@ function DeliveryCard({ assignment, onAction, busy }) {
             onClick={() => onAction(action[1], order.id)}>
             {action[0]}
           </button>
-          {status === 'OFFERED' && (
-            <button className="secondary-button" type="button" disabled={busy}
-              onClick={() => onAction('decline', order.id)}>
-              Decline offer
-            </button>
-          )}
-        </div>
-      )}
-      {action?.[2] && (
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={busy}
-          onClick={() => onAction(action[3], order.id)}
-        >
+          {action?.[2] && (
+        <button className="secondary-button" type="button" disabled={busy}
+          onClick={() => onAction(action[3], order.id)}>
           {action[2]}
         </button>
+      )}
+        </div>
       )}
     </article>
   );

@@ -52,18 +52,6 @@ public class CourierService implements OrderEventListener {
         this(couriers, assignments, orders, restaurants, dispatchQueue, transitions, Clock.systemUTC());
     }
 
-    public AssignmentView decline(UserAccount account, UUID orderId) {
-        Courier identity = requireCourier(account);
-        synchronized (dispatchLock) {
-            Assignment assignment = requireAssignment(orderId, identity.getId(), AssignmentStatus.OFFERED);
-            Order order = findReadyOrder(orderId);
-            dispatchQueue.enqueue(order);
-            Assignment declined = assignments.save(assignment.decline(clock.instant()));
-            retryDispatch(identity.getId());
-            return new AssignmentView(declined, order);
-        }
-    }
-
     CourierService(CourierRepository couriers, AssignmentRepository assignments, OrderRepository orders,
                    RestaurantRepository restaurants, DispatchQueueService dispatchQueue,
                    OrderTransitions transitions, Clock clock) {
@@ -156,7 +144,7 @@ public class CourierService implements OrderEventListener {
             }
             couriers.save(courier);
             Assignment declined = assignments.save(assignment.decline(clock.instant()));
-            dispatchQueue.enqueue(orderId);
+            dispatchQueue.enqueue(order);
             retryDispatch(courier.getId());
             return new AssignmentView(declined, order);
         }
