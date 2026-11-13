@@ -123,31 +123,3 @@ npm run build
 
 Backend tests use memory or an isolated local HTTP fixture; they never access
 the shared Supabase database. Frontend tests mock backend API calls.
-
-## Verifying issue 7
-
-1. Start the backend and frontend. No database setup is needed.
-2. Log in as `restaurant@example.com` with password `password`. Open
-   **Bobs Burgers** and select **Edit menu**. This demo account owns that restaurant.
-   Alternatively, register **Restaurant Staff** with a username, password and
-   restaurant name; the backend creates its owned restaurant immediately. Logo
-   and menu-file selections are optional and kept locally in memory.
-3. Add **Drink / 3.99**, **French Fries / 5.99**, and another **Drink / 3.99**.
-   Menu items require only a name and price. Names and prices may repeat within
-   and across restaurants.
-4. Edit a name or price, mark an item sold out and available again, then remove
-   an item. Staff can only manage their own restaurant's menu.
-5. Use a private browser session to log in as `customer@example.com` with password
-   `password`, or register a customer account. Browse the menu and place an order.
-   Sold-out and removed items cannot be ordered.
-6. After placing an order, edit or remove the item as staff. Refresh the customer's
-   orders: the original item name, unit price and quantity remain unchanged.
-
-Other demo logins are `courier@example.com` and `operator@example.com`, both with
-password `password`. Couriers can browse; menu management is restricted to owning
-restaurant staff. Accounts, restaurants, menus, and orders reset when the
-backend restarts; ready orders still awaiting courier assignment are restored
-from the dispatch queue file.
-
-See [the issue 7 integration notes](docs/issue-7-integration.md) for the exact
-regression history and current implementation.

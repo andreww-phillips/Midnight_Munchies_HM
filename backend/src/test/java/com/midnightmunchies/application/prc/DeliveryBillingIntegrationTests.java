@@ -25,6 +25,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -53,6 +54,7 @@ class DeliveryBillingIntegrationTests {
     @TestConfiguration
     static class PricingFixture {
         @Bean
+        @Primary
         DeliveryPricing testDeliveryPricing() {
             return mock(DeliveryPricing.class);
         }
