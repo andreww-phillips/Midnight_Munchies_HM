@@ -36,5 +36,4 @@ backend/data/
 *.local
 replay_pid*
 docs/issue-51-order-ledger.md
-README.md
 docs/issue-51-verify.md
