@@ -43,6 +43,7 @@ describe("restaurant order API", () => {
 
   it.each([
     ["orders", () => api.orders(), "GET", "/api/ord/orders", undefined, []],
+    ["summary", () => api.orderSummary("order-1"), "GET", "/api/prc/orders/order-1/summary", undefined, { orderId: "order-1", totalCharge: null, pricingPending: true }],
     ["queue", () => api.preparationQueue("restaurant-1"), "GET", "/api/ord/restaurants/restaurant-1/preparation", undefined, []],
     ["accept", () => api.acceptOrder("restaurant-1", "order-1"), "POST", "/api/ord/restaurants/restaurant-1/orders/order-1/accept", undefined, { status: "ACCEPTED" }],
     ["reject", () => api.rejectOrder("restaurant-1", "order-1", "Out of fries"), "POST", "/api/ord/restaurants/restaurant-1/orders/order-1/reject", { reason: "Out of fries" }, { status: "REJECTED" }],

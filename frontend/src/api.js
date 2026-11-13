@@ -62,6 +62,7 @@ export const api = {
     body: JSON.stringify({ lines })
   }),
   orders: () => request("/api/ord/orders"),
+  orderSummary: (orderId) => request(`/api/prc/orders/${orderId}/summary`),
   preparationQueue: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/preparation`),
   acceptOrder: (restaurantId, orderId) => request(`/api/ord/restaurants/${restaurantId}/orders/${orderId}/accept`, {
     method: "POST"

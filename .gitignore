@@ -35,3 +35,4 @@ backend/data/
 *.log
 *.local
 replay_pid*
+docs/issue-51-order-ledger.md
