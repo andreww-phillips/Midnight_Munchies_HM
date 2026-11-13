@@ -1,3 +1,9 @@
 package com.midnightmunchies.domain.dlv;
 
-// Phase III architecture placeholder for offline, idle, assigned, and carrying states.
+/** The complete courier duty and delivery state vocabulary. */
+public enum CourierState {
+	OFFLINE,
+	IDLE,
+	ASSIGNED,
+	CARRYING
+}
