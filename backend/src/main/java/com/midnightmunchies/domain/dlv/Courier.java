@@ -1,90 +1,89 @@
 package com.midnightmunchies.domain.dlv;
 
+import com.midnightmunchies.domain.ord.Order;
+import com.midnightmunchies.domain.ord.OrderStatus;
+
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
+/** A courier starts offline and may handle one ready order at a time. */
 public final class Courier {
-    private final UUID id;
-    private boolean onDuty;
-    private CourierState state = CourierState.OFFLINE;
-    private UUID orderId;
 
-    public Courier(UUID id) {
-        this.id = Objects.requireNonNull(id, "id must not be null");
-    }
+	private final UUID id;
+	private Location location;
+	private CourierState state = CourierState.OFFLINE;
+	private Order assignedOrder;
 
-    public UUID getId() {
-        return id;
-    }
+	public Courier(UUID id, Location location) {
+		this.id = Objects.requireNonNull(id, "id must not be null");
+		this.location = Objects.requireNonNull(location, "location must not be null");
+	}
 
-    public boolean isOnDuty() {
-        return onDuty;
-    }
+	public UUID getId() {
+		return id;
+	}
 
-    public CourierState getState() {
-        return state;
-    }
+	public Location getLocation() {
+		return location;
+	}
 
-    public UUID getOrderId() {
-        return orderId;
-    }
+	public void updateLocation(Location location) {
+		this.location = Objects.requireNonNull(location, "location must not be null");
+	}
 
-    public boolean isIdleOnDuty() {
-        return onDuty && state == CourierState.IDLE;
-    }
+	public CourierState getState() {
+		return state;
+	}
 
-    public void goOnDuty() {
-        if (onDuty) {
-            return;
-        }
-        onDuty = true;
-        state = CourierState.IDLE;
-    }
+	public Optional<Order> getAssignedOrder() {
+		return Optional.ofNullable(assignedOrder);
+	}
 
-    public void goOffline() {
-        if (orderId != null) {
-            throw new IllegalStateException("You cannot go offline while assigned to an order");
-        }
-        onDuty = false;
-        state = CourierState.OFFLINE;
-    }
+	public void goOnDuty() {
+		requireState(CourierState.OFFLINE, "go on duty");
+		state = CourierState.IDLE;
+	}
 
-    public void offer(UUID nextOrderId) {
-        Objects.requireNonNull(nextOrderId, "orderId must not be null");
-        if (!isIdleOnDuty()) {
-            throw new IllegalStateException("Only idle, on-duty couriers can receive an offer");
-        }
-        orderId = nextOrderId;
-        state = CourierState.OFFERED;
-    }
+	public void goOffDuty() {
+		requireState(CourierState.IDLE, "go off duty");
+		state = CourierState.OFFLINE;
+	}
 
-    public void accept(UUID expectedOrderId) {
-        requireOrder(expectedOrderId, CourierState.OFFERED);
-        state = CourierState.ASSIGNED;
-    }
+	/** Accepts an offered order only after the restaurant has marked it ready. */
+	public void acceptOrder(Order order) {
+		requireState(CourierState.IDLE, "accept an order");
+		Objects.requireNonNull(order, "order must not be null");
+		requireReady(order, "accept an order");
+		assignedOrder = order;
+		state = CourierState.ASSIGNED;
+	}
 
-    public void pickUp(UUID expectedOrderId) {
-        requireOrder(expectedOrderId, CourierState.ASSIGNED);
-        state = CourierState.CARRYING;
-    }
+	public void confirmPickup() {
+		requireState(CourierState.ASSIGNED, "confirm pickup");
+		requireReady(assignedOrder, "confirm pickup");
+		assignedOrder.confirmPickup();
+		state = CourierState.CARRYING;
+	}
 
-    public void deliver(UUID expectedOrderId) {
-        requireOrder(expectedOrderId, CourierState.CARRYING);
-        orderId = null;
-        state = CourierState.IDLE;
-    }
+	public void confirmDelivery() {
+		requireState(CourierState.CARRYING, "confirm delivery");
+		assignedOrder.confirmDelivery();
+		assignedOrder = null;
+		state = CourierState.IDLE;
+	}
 
-    public void release(UUID expectedOrderId) {
-        if (!Objects.equals(orderId, expectedOrderId)) {
-            throw new IllegalStateException("Courier is not assigned to this order");
-        }
-        orderId = null;
-        state = onDuty ? CourierState.IDLE : CourierState.OFFLINE;
-    }
+	private void requireState(CourierState expected, String action) {
+		if (state != expected) {
+			throw new IllegalCourierTransitionException(state, action);
+		}
+	}
 
-    private void requireOrder(UUID expectedOrderId, CourierState expectedState) {
-        if (!Objects.equals(orderId, expectedOrderId) || state != expectedState) {
-            throw new IllegalStateException("Courier order is not in the required state");
-        }
-    }
+	private void requireReady(Order order, String action) {
+		OrderStatus status = order.getStatus();
+		if (status != OrderStatus.READY) {
+			throw new IllegalCourierTransitionException(state, action,
+					": order " + order.getId() + " must be READY but is " + status);
+		}
+	}
 }

@@ -1,6 +1,6 @@
 package com.midnightmunchies.domain.ord;
 
-/** The concrete order states. Rejected and Cancelled are terminal and allow no transitions. */
+/** The concrete order states. Delivered, Rejected and Cancelled allow no transitions. */
 final class OrderStates {
 
 	static final OrderState PLACED = new Placed();
@@ -92,7 +92,7 @@ final class OrderStates {
 		}
 
 		@Override
-		public OrderState pickUp() {
+		public OrderState confirmPickup() {
 			return PICKED_UP;
 		}
 	}
@@ -104,7 +104,7 @@ final class OrderStates {
 		}
 
 		@Override
-		public OrderState deliver() {
+		public OrderState confirmDelivery() {
 			return DELIVERED;
 		}
 	}

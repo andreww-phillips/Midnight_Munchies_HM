@@ -91,12 +91,12 @@ public final class Order {
 		transitionTo(state.markReady());
 	}
 
-	public void pickUp() {
-		transitionTo(state.pickUp());
+	public void confirmPickup() {
+		transitionTo(state.confirmPickup());
 	}
 
-	public void deliver() {
-		transitionTo(state.deliver());
+	public void confirmDelivery() {
+		transitionTo(state.confirmDelivery());
 	}
 
 	public void cancel() {

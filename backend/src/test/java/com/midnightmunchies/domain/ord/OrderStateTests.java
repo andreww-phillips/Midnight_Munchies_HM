@@ -13,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class OrderStateTests {
 
 	private static final List<Consumer<Order>> ALL_TRANSITIONS = List.of(
-			Order::accept, order -> order.reject("reason"), Order::startPreparing, Order::markReady, Order::cancel);
+			Order::accept, order -> order.reject("reason"), Order::startPreparing, Order::markReady, Order::cancel,
+			Order::confirmPickup, Order::confirmDelivery);
 
 	@Test
 	void happyPathMovesPlacedAcceptedPreparingReady() {
@@ -82,15 +83,19 @@ class OrderStateTests {
 	}
 
 	@Test
-	void readyOrderCannotBeAdvancedOrCancelledHere() {
+	void readyOrderOnlyAllowsPickup() {
 		Order ready = order();
 		ready.accept();
 		ready.startPreparing();
 		ready.markReady();
-		for (Consumer<Order> transition : ALL_TRANSITIONS) {
+		List<Consumer<Order>> forbidden = List.of(Order::accept, order -> order.reject("reason"),
+				Order::startPreparing, Order::markReady, Order::cancel, Order::confirmDelivery);
+		for (Consumer<Order> transition : forbidden) {
 			assertThrows(IllegalOrderTransitionException.class, () -> transition.accept(ready));
 		}
 		assertEquals(OrderStatus.READY, ready.getStatus());
+		ready.confirmPickup();
+		assertEquals(OrderStatus.PICKED_UP, ready.getStatus());
 	}
 
 	@Test
