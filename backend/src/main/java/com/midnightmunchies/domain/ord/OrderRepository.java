@@ -1,4 +1,4 @@
-package com.midnightmunchies.domain.ord.repository;
+package com.midnightmunchies.domain.ord;
 
 import com.midnightmunchies.domain.ord.Order;
 
