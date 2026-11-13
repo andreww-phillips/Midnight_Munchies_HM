@@ -1,4 +1,4 @@
-package com.midnightmunchies.application;
+package com.midnightmunchies.application.reg;
 
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;

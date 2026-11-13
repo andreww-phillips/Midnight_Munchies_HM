@@ -1,10 +1,10 @@
-package com.midnightmunchies.application;
+package com.midnightmunchies.application.reg;
 
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
 import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.RestaurantStatus;
-import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
+import com.midnightmunchies.domain.ord.RestaurantRepository;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;

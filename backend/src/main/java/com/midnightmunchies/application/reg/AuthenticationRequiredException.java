@@ -1,4 +1,4 @@
-package com.midnightmunchies.application;
+package com.midnightmunchies.application.reg;
 
 public class AuthenticationRequiredException extends RuntimeException {
     public AuthenticationRequiredException(String message) {

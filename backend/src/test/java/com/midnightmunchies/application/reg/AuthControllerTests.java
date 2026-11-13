@@ -1,4 +1,4 @@
-package com.midnightmunchies.application;
+package com.midnightmunchies.application.reg;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
