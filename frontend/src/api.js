@@ -97,5 +97,6 @@ export const api = {
   reassignDelivery: (orderId) => request(`/api/dlv/orders/${orderId}/reassign`, {
     method: "POST"
   }),
-  operatorDeliveries: () => request("/api/dlv/operator/deliveries")
+  operatorDeliveries: () => request("/api/dlv/operator/deliveries"),
+  cityMap: () => request("/api/dash/map")
 };

@@ -276,6 +276,17 @@ class CourierServiceTests {
         assertEquals(id(near), assignments.findActiveByOrderId(order.getId()).orElseThrow().courierId());
     }
 
+    @Test
+    void newCouriersStartInsideTheCityInsteadOfAtTheOrigin() {
+        UserAccount courier = account(UserRole.COURIER);
+
+        service.setDuty(courier, true);
+
+        Location location = couriers.findById(id(courier)).orElseThrow().getLocation();
+        assertTrue(Math.abs(location.latitude() - 45.5017) < 0.02);
+        assertTrue(Math.abs(location.longitude() + 73.5673) < 0.02);
+    }
+
     private Order order(boolean isReady) {
         return order(isReady, UUID.randomUUID());
     }
