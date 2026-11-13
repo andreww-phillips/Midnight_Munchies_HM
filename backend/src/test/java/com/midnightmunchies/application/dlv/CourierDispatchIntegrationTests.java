@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 class CourierDispatchIntegrationTests {
@@ -53,12 +52,15 @@ class CourierDispatchIntegrationTests {
         UserAccount courier = courierAccount();
         courierService.setDuty(courier, true);
 
-        assertEquals(List.of(second.getId()), dispatchQueue.view());
+        assertEquals(List.of(first.getId(), second.getId()), dispatchQueue.view());
         CourierService.AssignmentView offer = courierService.view(courier).assignment();
         assertEquals(first.getId(), offer.order().getId());
         assertEquals(AssignmentStatus.OFFERED, offer.assignment().status());
         assertEquals(OrderStatus.READY, orders.findById(first.getId()).orElseThrow().getStatus());
-        assertTrue(dispatchQueue.view().stream().noneMatch(first.getId()::equals));
+
+        courierService.accept(courier, first.getId());
+
+        assertEquals(List.of(second.getId()), dispatchQueue.view());
     }
 
     private Order readyOrder() {

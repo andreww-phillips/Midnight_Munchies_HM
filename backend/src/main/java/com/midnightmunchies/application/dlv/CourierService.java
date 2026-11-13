@@ -123,6 +123,8 @@ public class CourierService implements OrderEventListener {
             }
             couriers.save(courier);
             Assignment accepted = assignments.save(assignment.accept(clock.instant()));
+            dispatchQueue.remove(orderId);
+            retryDispatch(null);
             return new AssignmentView(accepted, order);
         }
     }
@@ -259,32 +261,34 @@ public class CourierService implements OrderEventListener {
 
     private void retryDispatch(UUID excludedCourierId) {
         Set<UUID> excluded = excludedCourierId == null ? Set.of() : Set.of(excludedCourierId);
-        while (true) {
-            Optional<UUID> nextOrderId = dispatchQueue.peek();
-            if (nextOrderId.isEmpty()) {
-                return;
-            }
-            UUID orderId = nextOrderId.get();
+        for (UUID orderId : dispatchQueue.view()) {
             Optional<Order> readyOrder = orders.findById(orderId);
             if (readyOrder.isEmpty()) {
-                return;
-            }
-            if (readyOrder.get().getStatus() != OrderStatus.READY
-                    || assignments.findActiveByOrderId(orderId).isPresent()) {
                 dispatchQueue.remove(orderId);
+                continue;
+            }
+            if (readyOrder.get().getStatus() != OrderStatus.READY) {
+                dispatchQueue.remove(orderId);
+                continue;
+            }
+            Optional<Assignment> activeAssignment = assignments.findActiveByOrderId(orderId);
+            if (activeAssignment.isPresent()) {
+                if (activeAssignment.get().status() != AssignmentStatus.OFFERED) {
+                    dispatchQueue.remove(orderId);
+                }
                 continue;
             }
             Optional<Courier> courier = selectCourier(readyOrder.get(), excluded);
             if (courier.isEmpty()) {
-                return;
+                continue;
             }
             assignments.save(Assignment.offer(orderId, courier.get().getId(), clock.instant()));
-            dispatchQueue.remove(orderId);
         }
     }
 
     private Optional<Courier> selectCourier(Order order, Set<UUID> excluded) {
         List<Courier> eligible = couriers.findAll().stream()
+                .filter(courier -> courier.getState() == CourierState.IDLE)
                 .filter(courier -> !excluded.contains(courier.getId()))
                 .filter(courier -> assignments.findActiveByCourierId(courier.getId()).isEmpty())
                 .toList();

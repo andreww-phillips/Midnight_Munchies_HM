@@ -75,6 +75,9 @@ class CourierServiceTests {
         CourierService.CourierDashboard dashboard = service.setDuty(courier, true);
         assertEquals(CourierState.IDLE, dashboard.state());
         assertEquals(AssignmentStatus.OFFERED, dashboard.assignment().assignment().status());
+        assertEquals(List.of(order.getId()), queue.view());
+
+        service.accept(courier, order.getId());
         assertTrue(queue.view().isEmpty());
     }
 
@@ -100,6 +103,7 @@ class CourierServiceTests {
         assertFalse(result.queued());
         assertEquals(id(second), result.replacement().courierId());
         assertEquals(AssignmentStatus.OFFERED, result.replacement().status());
+        assertEquals(List.of(order.getId()), queue.view());
         assertEquals(AssignmentStatus.REASSIGNED, result.previous().status());
         assertEquals(operator.id(), result.previous().releasedBy());
         assertEquals(CourierState.OFFLINE, service.view(first).state());
@@ -148,6 +152,8 @@ class CourierServiceTests {
         UserAccount next = account(UserRole.COURIER);
         service.setDuty(next, true);
         assertEquals(id(next), assignments.findActiveByOrderId(order.getId()).orElseThrow().courierId());
+        assertEquals(List.of(order.getId()), queue.view());
+        service.accept(next, order.getId());
         assertTrue(queue.view().isEmpty());
     }
 
@@ -231,15 +237,16 @@ class CourierServiceTests {
         service.onEvent(event(first, OrderStatus.PREPARING, OrderStatus.READY));
         service.onEvent(event(second, OrderStatus.PREPARING, OrderStatus.READY));
 
-        assertEquals(List.of(second.getId()), queue.view());
+        assertEquals(List.of(first.getId(), second.getId()), queue.view());
         service.accept(courier, first.getId());
+        assertEquals(List.of(second.getId()), queue.view());
         service.pickUp(courier, first.getId());
         service.deliver(courier, first.getId());
 
         CourierService.AssignmentView next = service.view(courier).assignment();
         assertEquals(second.getId(), next.order().getId());
         assertEquals(AssignmentStatus.OFFERED, next.assignment().status());
-        assertFalse(queue.view().contains(second.getId()));
+        assertEquals(List.of(second.getId()), queue.view());
     }
 
     @Test
@@ -255,8 +262,33 @@ class CourierServiceTests {
 
         assertEquals(id(nextCourier),
                 assignments.findActiveByOrderId(order.getId()).orElseThrow().courierId());
-        assertTrue(queue.view().isEmpty());
+        assertEquals(List.of(order.getId()), queue.view());
         assertEquals(CourierState.IDLE, service.view(declining).state());
+        service.accept(nextCourier, order.getId());
+        assertTrue(queue.view().isEmpty());
+    }
+
+    @Test
+    void keepsFifoOrdersQueuedWhileOfferedAndOnlyDequeuesEachOnAcceptance() {
+        UserAccount firstCourier = account(UserRole.COURIER);
+        UserAccount secondCourier = account(UserRole.COURIER);
+        service.setDuty(firstCourier, true);
+        service.setDuty(secondCourier, true);
+        Order first = order(true);
+        Order second = order(true);
+
+        service.onEvent(event(first, OrderStatus.PREPARING, OrderStatus.READY));
+        service.onEvent(event(second, OrderStatus.PREPARING, OrderStatus.READY));
+
+        assertEquals(List.of(first.getId(), second.getId()), queue.view());
+        assertEquals(id(firstCourier), assignments.findActiveByOrderId(first.getId()).orElseThrow().courierId());
+        assertEquals(id(secondCourier), assignments.findActiveByOrderId(second.getId()).orElseThrow().courierId());
+
+        service.accept(firstCourier, first.getId());
+
+        assertEquals(List.of(second.getId()), queue.view());
+        service.accept(secondCourier, second.getId());
+        assertTrue(queue.view().isEmpty());
     }
 
     @Test
