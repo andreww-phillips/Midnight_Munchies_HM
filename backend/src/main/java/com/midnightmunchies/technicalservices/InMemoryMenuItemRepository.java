@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InMemoryMenuItemRepository implements MenuItemRepository, SimulatorStore {
+public class InMemoryMenuItemRepository implements MenuItemRepository {
 
 	private final Map<UUID, MenuItem> menuItems = new ConcurrentHashMap<>();
 
@@ -44,10 +44,5 @@ public class InMemoryMenuItemRepository implements MenuItemRepository, Simulator
 		return menuItems.values().stream()
 				.filter(menuItem -> menuItem.getRestaurantId().equals(restaurantId))
 				.toList();
-	}
-
-	@Override
-	public synchronized void clear() {
-		menuItems.clear();
 	}
 }
