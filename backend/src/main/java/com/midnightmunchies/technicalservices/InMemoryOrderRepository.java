@@ -1,8 +1,8 @@
-package com.midnightmunchies.technicalservices.ord.repository;
+package com.midnightmunchies.technicalservices;
 
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderStatus;
-import com.midnightmunchies.domain.ord.repository.OrderRepository;
+import com.midnightmunchies.domain.ord.OrderRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Comparator;

@@ -1,4 +1,4 @@
-package com.midnightmunchies.technicalservices.ord.repository;
+package com.midnightmunchies.technicalservices;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;

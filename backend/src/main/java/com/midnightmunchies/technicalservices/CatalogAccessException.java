@@ -1,4 +1,4 @@
-package com.midnightmunchies.technicalservices.ord.repository;
+package com.midnightmunchies.technicalservices;
 
 /** A catalog outage is distinct from invalid input or an empty menu. */
 public class CatalogAccessException extends RuntimeException {

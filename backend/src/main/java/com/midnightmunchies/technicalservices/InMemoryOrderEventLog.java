@@ -1,7 +1,7 @@
-package com.midnightmunchies.technicalservices.ord.repository;
+package com.midnightmunchies.technicalservices;
 
 import com.midnightmunchies.domain.ord.OrderEvent;
-import com.midnightmunchies.domain.ord.repository.OrderEventLog;
+import com.midnightmunchies.domain.ord.OrderEventLog;
 import org.springframework.stereotype.Repository;
 
 import java.util.LinkedHashMap;

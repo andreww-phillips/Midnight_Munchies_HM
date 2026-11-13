@@ -1,11 +1,11 @@
-package com.midnightmunchies.technicalservices.ord;
+package com.midnightmunchies.technicalservices;
 
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.RestaurantStatus;
-import com.midnightmunchies.domain.ord.repository.MenuItemRepository;
-import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
+import com.midnightmunchies.domain.ord.MenuItemRepository;
+import com.midnightmunchies.domain.ord.RestaurantRepository;
 
 import java.math.BigDecimal;
 import java.util.UUID;

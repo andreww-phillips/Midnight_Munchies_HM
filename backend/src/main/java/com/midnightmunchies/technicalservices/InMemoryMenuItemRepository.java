@@ -1,8 +1,8 @@
-package com.midnightmunchies.technicalservices.ord.repository;
+package com.midnightmunchies.technicalservices;
 
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.CatalogNames;
-import com.midnightmunchies.domain.ord.repository.MenuItemRepository;
+import com.midnightmunchies.domain.ord.MenuItemRepository;
 
 import java.util.List;
 import java.util.Map;

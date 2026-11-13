@@ -1,4 +1,4 @@
-package com.midnightmunchies.technicalservices.ord.repository;
+package com.midnightmunchies.technicalservices;
 
 import com.midnightmunchies.domain.ord.CatalogNames;
 import com.midnightmunchies.domain.ord.DuplicateNameException;

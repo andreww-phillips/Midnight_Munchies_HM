@@ -1,8 +1,7 @@
-package com.midnightmunchies.technicalservices.ord.repository;
+package com.midnightmunchies.technicalservices;
 
-import com.midnightmunchies.domain.ord.repository.MenuItemRepository;
-import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
-import com.midnightmunchies.technicalservices.ord.DemoCatalog;
+import com.midnightmunchies.domain.ord.MenuItemRepository;
+import com.midnightmunchies.domain.ord.RestaurantRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;

@@ -1,9 +1,9 @@
-package com.midnightmunchies.technicalservices.ord.repository;
+package com.midnightmunchies.technicalservices;
 
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.OrderLine;
-import com.midnightmunchies.domain.ord.repository.MenuItemRepository;
+import com.midnightmunchies.domain.ord.MenuItemRepository;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

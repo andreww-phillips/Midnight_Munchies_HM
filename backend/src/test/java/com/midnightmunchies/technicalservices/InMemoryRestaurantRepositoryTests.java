@@ -1,8 +1,8 @@
-package com.midnightmunchies.technicalservices.ord.repository;
+package com.midnightmunchies.technicalservices;
 
 import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.RestaurantStatus;
-import com.midnightmunchies.domain.ord.repository.RestaurantRepository;
+import com.midnightmunchies.domain.ord.RestaurantRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

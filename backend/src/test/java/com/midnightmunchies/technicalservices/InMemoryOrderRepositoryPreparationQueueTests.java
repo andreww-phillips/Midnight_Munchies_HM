@@ -1,8 +1,8 @@
-package com.midnightmunchies.technicalservices.ord.repository;
+package com.midnightmunchies.technicalservices;
 
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderLine;
-import com.midnightmunchies.domain.ord.repository.OrderRepository;
+import com.midnightmunchies.domain.ord.OrderRepository;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
