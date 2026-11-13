@@ -27,6 +27,10 @@ public final class DispatchQueue {
         return Optional.ofNullable(orderId);
     }
 
+    public synchronized Optional<UUID> peek() {
+        return Optional.ofNullable(orders.peekFirst());
+    }
+
     public synchronized void remove(UUID orderId) {
         if (queued.remove(orderId)) {
             orders.remove(orderId);

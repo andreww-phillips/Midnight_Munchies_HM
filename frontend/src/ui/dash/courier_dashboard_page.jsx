@@ -28,10 +28,18 @@ function DeliveryCard({ assignment, onAction, busy }) {
         ))}
       </ul>
       {action && (
-        <button className="primary-button" type="button" disabled={busy}
-          onClick={() => onAction(action[1], order.id)}>
-          {action[0]}
-        </button>
+        <div className="courier-delivery-actions">
+          <button className="primary-button" type="button" disabled={busy}
+            onClick={() => onAction(action[1], order.id)}>
+            {action[0]}
+          </button>
+          {status === 'OFFERED' && (
+            <button className="secondary-button" type="button" disabled={busy}
+              onClick={() => onAction('decline', order.id)}>
+              Decline offer
+            </button>
+          )}
+        </div>
       )}
     </article>
   );
@@ -83,12 +91,14 @@ export default function CourierDashboard({ onSessionExpired }) {
     const actions = {
       duty: () => api.setCourierDuty(!dashboard.onDuty),
       accept: () => api.acceptDelivery(orderId),
+      decline: () => api.declineDelivery(orderId),
       pickup: () => api.pickUpDelivery(orderId),
       deliver: () => api.deliverOrder(orderId)
     };
     const labels = {
       duty: dashboard.onDuty ? 'Go off duty' : 'Go on duty',
       accept: 'Accept delivery offer',
+      decline: 'Decline delivery offer',
       pickup: 'Confirm pickup',
       deliver: 'Confirm delivery'
     };
