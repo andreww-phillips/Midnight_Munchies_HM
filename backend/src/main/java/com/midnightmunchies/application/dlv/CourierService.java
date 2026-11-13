@@ -112,6 +112,29 @@ public class CourierService implements OrderEventListener {
         }
     }
 
+    public AssignmentView decline(UserAccount account, UUID orderId){
+        Courier identity = requireCourier(account);
+        synchronized (dispatchLock) {
+            Assignment assignment = findActiveAssignment(orderId);
+            requireAssignedCourier(assignment, identity.getId());
+            if (assignment.status() != AssignmentStatus.OFFERED) {
+                throw new DeliveryConflictException("This delivery offer is no longer available");
+            }
+            Order order = findReadyOrder(orderId);
+            Courier courier = findOrCreate(identity.getId());
+            try {
+                courier.declineOrder(order);
+            } catch (IllegalStateException exception) {
+                throw new DeliveryConflictException(exception.getMessage());
+            }
+            couriers.save(courier);
+            Assignment declined = assignments.save(assignment.decline(clock.instant()));
+            dispatchQueue.enqueue(orderId);
+            retryDispatch(courier.getId());
+            return new AssignmentView(declined, order);
+        }
+    }
+
     public AssignmentView pickUp(UserAccount account, UUID orderId) {
         Courier identity = requireCourier(account);
         synchronized (dispatchLock) {

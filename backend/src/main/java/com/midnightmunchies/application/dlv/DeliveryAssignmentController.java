@@ -27,6 +27,11 @@ public class DeliveryAssignmentController extends DlvControllerSupport {
         return execute(() -> courierService.accept(account(session), orderId));
     }
 
+    @PostMapping("/orders/{orderId}/decline")
+    public ResponseEntity<?> decline(@PathVariable UUID orderId, HttpSession session) {
+        return execute(() -> courierService.decline(account(session), orderId));
+    }
+
     @PostMapping("/orders/{orderId}/reassign")
     public ResponseEntity<?> reassign(@PathVariable UUID orderId, @RequestBody(required = false) ReassignRequest request,
                                       HttpSession session) {

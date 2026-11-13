@@ -62,6 +62,13 @@ public final class Courier {
 		assignedOrder = order;
 		state = CourierState.ASSIGNED;
 	}
+    /** Declines an offered order, returning to IDLE. */
+    public void declineOrder(Order order){
+        requireState(CourierState.IDLE, "decline an order");
+        Objects.requireNonNull(order, "order must not be null");
+        assignedOrder = null;
+        state = CourierState.IDLE;
+    }
 
 	/** Releases an accepted order only when the operator explicitly reassigns it. */
 	public void releaseOrder(Order order) {

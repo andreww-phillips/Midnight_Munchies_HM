@@ -85,6 +85,9 @@ export const api = {
   acceptDelivery: (orderId) => request(`/api/dlv/orders/${orderId}/accept`, {
     method: "POST"
   }),
+  declineDelivery: (orderId) => request(`/api/dlv/orders/${orderId}/decline`, {
+    method: "POST"
+  }),
   pickUpDelivery: (orderId) => request(`/api/dlv/orders/${orderId}/pickup`, {
     method: "POST"
   }),
