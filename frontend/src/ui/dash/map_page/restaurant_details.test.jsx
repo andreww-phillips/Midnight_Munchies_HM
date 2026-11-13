@@ -6,10 +6,10 @@ import { api } from '../../../api';
 import { CommandLogContext } from '../output_console/command_log';
 import RestaurantDetails from './restaurant_details';
 
-vi.mock('../../../api', () => ({ api: { orders: vi.fn(), menu: vi.fn() } }));
+vi.mock('../../../api', () => ({ api: { orders: vi.fn(), menu: vi.fn(), operatorDeliveries: vi.fn(), reassignDelivery: vi.fn() } }));
 
 const restaurant = {
-  id: 'r1', ownerId: 'staff-1', name: 'Bobs Burgers', status: 'OPEN', latitude: 45.5, longitude: -73.5,
+  id: 'r1', name: 'Bobs Burgers', status: 'OPEN', latitude: 45.5, longitude: -73.5,
   pendingCount: 1, queuedCount: 2, preparingCount: 1, readyCount: 1, band: 'GREEN'
 };
 const users = {
@@ -25,7 +25,7 @@ const buttons = () => [...container.querySelectorAll('button')].map((element) =>
 const queueItems = () => [...container.querySelectorAll('.details-queue li')].map((element) => element.textContent);
 async function render(user, overrides = {}, props = {}) {
   await act(async () => root.render(
-    <RestaurantDetails restaurant={{ ...restaurant, ...overrides }} user={user} onClose={() => {}} onOpenRestaurant={() => {}} {...props} />
+    <RestaurantDetails restaurant={{ ...restaurant, ownedByViewer: user === users.owner, ...overrides }} user={user} onClose={() => {}} onOpenRestaurant={() => {}} {...props} />
   ));
 }
 
@@ -40,6 +40,7 @@ beforeEach(() => {
     { id: 'done-1', restaurantId: 'r1', status: 'CANCELLED', createdAt: '2026-11-12T22:00:00Z' },
     { id: 'other-1', restaurantId: 'r2', status: 'PLACED', createdAt: '2026-11-12T23:00:00Z' }
   ]);
+  api.operatorDeliveries.mockResolvedValue({ active: [], queued: [] });
   api.menu.mockResolvedValue([
     { id: 'item-1', restaurantId: 'r1', name: 'Midnight Burger', price: 12.99, status: 'AVAILABLE' },
     { id: 'item-2', restaurantId: 'r1', name: 'Loaded Fries', price: 5.49, status: 'SOLD_OUT' }
@@ -64,13 +65,34 @@ describe('restaurant details panel', () => {
     expect(container.textContent).toContain('Status: OPEN · Band: Short (green)');
   });
 
-  it('shows menu items and marks sold out ones for every role', async () => {
-    for (const user of Object.values(users)) {
+  it('shows the menu with sold out items to the operator, the owner and customers of an open restaurant', async () => {
+    for (const user of [users.operator, users.owner, users.customer]) {
       await render(user);
       const items = [...container.querySelectorAll('.details-menu li')].map((element) => element.textContent);
       expect(items).toEqual(['Midnight Burger · $12.99', 'Loaded Fries · $5.49Sold out']);
     }
     expect(api.menu).toHaveBeenCalledWith('r1');
+  });
+
+  it('hides other restaurants menus from staff and all menus from couriers', async () => {
+    for (const user of [users.otherStaff, users.courier]) {
+      await render(user);
+      expect(container.querySelector('.details-menu')).toBeNull();
+      expect(container.textContent).not.toContain('Menu');
+    }
+    expect(api.menu).not.toHaveBeenCalled();
+  });
+
+  it('hides the menu of a paused or closed restaurant from customers', async () => {
+    for (const status of ['PAUSED', 'CLOSED']) {
+      await render(users.customer, { status });
+      expect(container.querySelector('.details-menu')).toBeNull();
+      expect(container.querySelector('.details-menu-closed').textContent).toBe('The menu is available when the restaurant is open.');
+    }
+    expect(api.menu).not.toHaveBeenCalled();
+
+    await render(users.operator, { status: 'PAUSED' });
+    expect(container.querySelectorAll('.details-menu li')).toHaveLength(2);
   });
 
   it('shows and logs a failed menu load', async () => {
@@ -131,5 +153,62 @@ describe('restaurant details panel', () => {
     const manage = [...container.querySelectorAll('button')].find((element) => element.textContent === 'Manage orders');
     await act(async () => manage.click());
     expect(onOpenRestaurant).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }), 'orders');
+  });
+
+  it('shows the Montreal area of the restaurant when known', async () => {
+    await render(users.customer, { area: 'Downtown – McGill University' });
+    expect(container.querySelector('.details-area').textContent).toBe('Area: Downtown – McGill University');
+
+    await render(users.customer, { area: null });
+    expect(container.querySelector('.details-area')).toBeNull();
+  });
+
+  it('lets the operator reassign deliveries of this restaurant only', async () => {
+    api.operatorDeliveries.mockResolvedValue({ active: [
+      { orderId: 'ready-1', courierId: 'cccccccc-1', status: 'ACCEPTED', waitingSeconds: 90, reassignable: true },
+      { orderId: 'other-ready', courierId: 'dddddddd-1', status: 'OFFERED', waitingSeconds: 10, reassignable: true }
+    ], queued: [] });
+    api.reassignDelivery.mockResolvedValue({ queued: true, replacement: null });
+    const record = vi.fn();
+    await act(async () => root.render(
+      <CommandLogContext.Provider value={{ entries: [], record, changeIdentity: () => {} }}>
+        <RestaurantDetails restaurant={restaurant} user={users.operator} onClose={() => {}} />
+      </CommandLogContext.Provider>
+    ));
+
+    const rows = [...container.querySelectorAll('.details-deliveries li')];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain('Order #ready-1 · ACCEPTED · courier cccccccc');
+
+    await act(async () => rows[0].querySelector('button').click());
+
+    expect(api.reassignDelivery).toHaveBeenCalledWith('ready-1');
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({ action: 'Reassign stalled order', outcome: 'success', orderId: 'ready-1' }));
+    expect(api.operatorDeliveries).toHaveBeenCalledTimes(2);
+  });
+
+  it('disables reassigning a picked-up delivery and shows reassign errors', async () => {
+    api.operatorDeliveries.mockResolvedValue({ active: [
+      { orderId: 'ready-1', courierId: 'cccccccc-1', status: 'OFFERED', waitingSeconds: 5, reassignable: false }
+    ], queued: [] });
+    await render(users.operator);
+    expect(container.querySelector('.details-deliveries button').disabled).toBe(true);
+
+    api.operatorDeliveries.mockResolvedValue({ active: [
+      { orderId: 'ready-1', courierId: 'cccccccc-1', status: 'ACCEPTED', waitingSeconds: 5, reassignable: true }
+    ], queued: [] });
+    api.reassignDelivery.mockRejectedValue(Object.assign(new Error('Only a ready order can be reassigned'), { status: 409 }));
+    await render(users.operator, { readyCount: 2 });
+    await act(async () => container.querySelector('.details-deliveries button').click());
+
+    expect(container.querySelector('[role="alert"]').textContent).toBe('Only a ready order can be reassigned');
+  });
+
+  it('does not load deliveries for other roles', async () => {
+    for (const user of [users.owner, users.customer, users.courier]) {
+      await render(user);
+      expect(container.querySelector('.details-deliveries')).toBeNull();
+    }
+    expect(api.operatorDeliveries).not.toHaveBeenCalled();
   });
 });

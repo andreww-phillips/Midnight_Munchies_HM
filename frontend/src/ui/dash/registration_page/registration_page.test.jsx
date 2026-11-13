@@ -174,7 +174,7 @@ it('switches staff to the map view and opens their restaurant orders from the ma
   api.preparationQueue.mockResolvedValue([]);
   api.cityMap.mockResolvedValue({
     bounds: { minLat: 45.5, maxLat: 45.5, minLon: -73.5, maxLon: -73.5 },
-    restaurants: [{ ...restaurant, status: 'OPEN', latitude: 45.5, longitude: -73.5,
+    restaurants: [{ ...restaurant, ownedByViewer: true, status: 'OPEN', latitude: 45.5, longitude: -73.5,
       pendingCount: 0, queuedCount: 0, preparingCount: 0, readyCount: 0, band: 'GREEN' }],
     couriers: []
   });

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../../api';
 import { useCommandLog } from '../output_console/command_log';
 import { bandStyle } from './map_bands';
+import RestaurantDeliveries from './restaurant_deliveries';
 
 const STAGES = ['PLACED', 'ACCEPTED', 'PREPARING', 'READY'];
 
@@ -15,7 +16,14 @@ function activeQueue(orders, restaurantId) {
 
 function canSeeQueue(user, restaurant) {
   if (user?.role === 'PLATFORM_OPERATOR') return true;
-  return user?.role === 'RESTAURANT_STAFF' && Boolean(user.id) && restaurant.ownerId === user.id;
+  return user?.role === 'RESTAURANT_STAFF' && restaurant.ownedByViewer === true;
+}
+
+function canSeeMenu(user, restaurant) {
+  if (user?.role === 'PLATFORM_OPERATOR') return true;
+  if (user?.role === 'RESTAURANT_STAFF') return restaurant.ownedByViewer === true;
+  if (user?.role === 'CUSTOMER') return restaurant.status === 'OPEN';
+  return false;
 }
 
 function quickActions(user, restaurant) {
@@ -35,6 +43,7 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
   const [menu, setMenu] = useState([]);
   const [menuError, setMenuError] = useState('');
   const showQueue = canSeeQueue(user, restaurant);
+  const showMenu = canSeeMenu(user, restaurant);
   const actions = quickActions(user, restaurant);
   const style = bandStyle(restaurant.band);
   const countsKey = [restaurant.pendingCount, restaurant.queuedCount, restaurant.preparingCount, restaurant.readyCount].join(':');
@@ -62,6 +71,7 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
   }, [showQueue, restaurant.id, countsKey, record, onSessionExpired]);
 
   useEffect(() => {
+    if (!showMenu) return undefined;
     let active = true;
     api.menu(restaurant.id)
       .then((items) => {
@@ -80,7 +90,7 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
           restaurantId: restaurant.id, httpStatus: loadError.status });
       });
     return () => { active = false; };
-  }, [restaurant.id, countsKey, record, onSessionExpired]);
+  }, [showMenu, restaurant.id, countsKey, record, onSessionExpired]);
 
   return (
     <section className="restaurant-details" aria-label={`${restaurant.name} details`}>
@@ -89,13 +99,17 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
         <button className="secondary-button" type="button" onClick={onClose}>Close</button>
       </div>
       <p className="muted">Status: {restaurant.status} · Band: {style.label}</p>
+      {restaurant.area && <p className="details-area">Area: {restaurant.area}</p>}
       <dl className="details-stats">
         <div><dt>Pending</dt><dd>{restaurant.pendingCount}</dd></div>
         <div><dt>Queued</dt><dd>{restaurant.queuedCount}</dd></div>
         <div><dt>In preparation</dt><dd>{restaurant.preparingCount}</dd></div>
         <div><dt>Ready</dt><dd>{restaurant.readyCount}</dd></div>
       </dl>
-      <div>
+      {user?.role === 'CUSTOMER' && !showMenu && (
+        <p className="muted details-menu-closed">The menu is available when the restaurant is open.</p>
+      )}
+      {showMenu && <div>
         <h4>Menu</h4>
         {menuError && <p role="alert">{menuError}</p>}
         {!menuError && menu.length === 0 && <p className="muted">No menu items yet.</p>}
@@ -109,7 +123,7 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
             ))}
           </ul>
         )}
-      </div>
+      </div>}
       {showQueue && (
         <div>
           <h4>Active orders</h4>
@@ -121,6 +135,13 @@ export default function RestaurantDetails({ restaurant, user, onClose, onOpenRes
             </ol>
           )}
         </div>
+      )}
+      {user?.role === 'PLATFORM_OPERATOR' && (
+        <RestaurantDeliveries
+          orderIds={queue.filter((order) => order.status === 'READY').map((order) => order.id)}
+          refreshKey={countsKey}
+          onSessionExpired={onSessionExpired}
+        />
       )}
       {actions.length > 0 && onOpenRestaurant && (
         <div className="details-actions">

@@ -283,8 +283,8 @@ class CourierServiceTests {
         service.setDuty(courier, true);
 
         Location location = couriers.findById(id(courier)).orElseThrow().getLocation();
-        assertTrue(Math.abs(location.latitude() - 45.5017) < 0.02);
-        assertTrue(Math.abs(location.longitude() + 73.5673) < 0.02);
+        assertTrue(com.midnightmunchies.domain.geo.MontrealServiceArea.contains(location.latitude(), location.longitude()));
+        assertEquals(com.midnightmunchies.domain.geo.MontrealServiceArea.placeFor(id(courier)).latitude(), location.latitude());
     }
 
     private Order order(boolean isReady) {

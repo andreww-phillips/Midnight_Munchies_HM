@@ -6,6 +6,7 @@ import com.midnightmunchies.domain.dash.CourierMarker;
 import com.midnightmunchies.domain.dash.MapBounds;
 import com.midnightmunchies.domain.dash.QueueBand;
 import com.midnightmunchies.domain.dash.RestaurantMarker;
+import com.midnightmunchies.domain.dash.WaitingOrder;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderLine;
 import com.midnightmunchies.domain.ord.Restaurant;
@@ -24,6 +25,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -35,7 +38,8 @@ class MapServiceTests {
     private final InMemoryRestaurantRepository restaurants = new InMemoryRestaurantRepository();
     private final InMemoryOrderRepository orders = new InMemoryOrderRepository();
     private final List<CourierMarker> couriers = new ArrayList<>();
-    private final MapService service = new MapService(restaurants, orders, () -> couriers);
+    private final List<UUID> waiting = new ArrayList<>();
+    private final MapService service = new MapService(restaurants, orders, () -> couriers, () -> waiting);
 
     @Test
     void countsOrdersByStageForEachRestaurant() {
@@ -117,9 +121,62 @@ class MapServiceTests {
     }
 
     @Test
+    void markersCarryTheNameOfTheirMontrealArea() {
+        restaurant("Diner", RestaurantStatus.OPEN, 45.5048, -73.5772);
+        couriers.add(new CourierMarker("c1", 45.5245, -73.5817, "IDLE"));
+
+        CityMap map = service.cityMap(loggedIn());
+
+        assertEquals("Downtown – McGill University", map.restaurants().get(0).area());
+        assertEquals("Plateau Mont-Royal – Mont-Royal Ave E", map.couriers().get(0).area());
+    }
+
+    @Test
+    void onlyTheOwningStaffSeeTheirRestaurantAsOwned() {
+        UUID ownerId = UUID.randomUUID();
+        restaurants.save(new Restaurant(UUID.randomUUID(), ownerId, "Owned", RestaurantStatus.OPEN, 45.50, -73.57));
+
+        assertTrue(service.cityMap(session(ownerId.toString(), UserRole.RESTAURANT_STAFF)).restaurants().get(0).ownedByViewer());
+        assertFalse(service.cityMap(session(UUID.randomUUID().toString(), UserRole.RESTAURANT_STAFF)).restaurants().get(0).ownedByViewer());
+        assertFalse(service.cityMap(session(ownerId.toString(), UserRole.CUSTOMER)).restaurants().get(0).ownedByViewer());
+        assertFalse(service.cityMap(loggedIn()).restaurants().get(0).ownedByViewer());
+    }
+
+    @Test
+    void operatorsSeeOrdersWaitingForACourierWithTheirRestaurant() {
+        Restaurant diner = restaurant("Diner", RestaurantStatus.OPEN, 45.50, -73.57);
+        Order first = ready(diner);
+        Order second = ready(diner);
+        waiting.add(first.getId());
+        waiting.add(second.getId());
+        waiting.add(UUID.randomUUID());
+
+        List<WaitingOrder> awaiting = service.cityMap(loggedIn()).awaitingCourier();
+
+        assertEquals(List.of(new WaitingOrder(first.getId(), diner.getId(), "Diner"),
+                new WaitingOrder(second.getId(), diner.getId(), "Diner")), awaiting);
+    }
+
+    @Test
+    void nonOperatorsDoNotSeeTheDispatchQueue() {
+        Restaurant diner = restaurant("Diner", RestaurantStatus.OPEN, 45.50, -73.57);
+        waiting.add(ready(diner).getId());
+
+        for (UserRole role : List.of(UserRole.CUSTOMER, UserRole.COURIER, UserRole.RESTAURANT_STAFF)) {
+            assertEquals(List.of(), service.cityMap(session(UUID.randomUUID().toString(), role)).awaitingCourier());
+        }
+    }
+
+    @Test
     void missingLoginIsRejected() {
         assertThrows(AuthenticationRequiredException.class, () -> service.cityMap(new MockHttpSession()));
         assertThrows(AuthenticationRequiredException.class, () -> service.cityMap(null));
+    }
+
+    private MockHttpSession session(String id, UserRole role) {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("authenticatedUser", new UserAccount(id, role + "@example.com", "hash", role));
+        return session;
     }
 
     private MockHttpSession loggedIn() {

@@ -1,5 +1,6 @@
 package com.midnightmunchies.domain.dash;
 
+import com.midnightmunchies.domain.geo.MontrealServiceArea;
 import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.RestaurantStatus;
 
@@ -8,7 +9,7 @@ import java.util.UUID;
 
 public record RestaurantMarker(
         UUID id,
-        UUID ownerId,
+        boolean ownedByViewer,
         String name,
         RestaurantStatus status,
         double latitude,
@@ -17,7 +18,8 @@ public record RestaurantMarker(
         int queuedCount,
         int preparingCount,
         int readyCount,
-        QueueBand band
+        QueueBand band,
+        String area
 ) implements MapMarker {
 
     public RestaurantMarker {
@@ -30,11 +32,12 @@ public record RestaurantMarker(
         }
     }
 
-    public static RestaurantMarker from(Restaurant restaurant, int pending, int queued, int preparing, int ready) {
+    public static RestaurantMarker from(Restaurant restaurant, boolean ownedByViewer, int pending, int queued,
+                                        int preparing, int ready) {
         Objects.requireNonNull(restaurant, "restaurant must not be null");
         return new RestaurantMarker(
                 restaurant.getId(),
-                restaurant.getOwnerId(),
+                ownedByViewer,
                 restaurant.getName(),
                 restaurant.getStatus(),
                 restaurant.getLatitude(),
@@ -43,7 +46,8 @@ public record RestaurantMarker(
                 queued,
                 preparing,
                 ready,
-                QueueBand.of(restaurant.getStatus(), queued)
+                QueueBand.of(restaurant.getStatus(), queued),
+                MontrealServiceArea.areaOf(restaurant.getLatitude(), restaurant.getLongitude())
         );
     }
 }

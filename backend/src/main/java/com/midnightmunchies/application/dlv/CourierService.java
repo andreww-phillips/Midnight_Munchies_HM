@@ -13,7 +13,7 @@ import com.midnightmunchies.domain.ord.OrderEvent;
 import com.midnightmunchies.domain.ord.OrderEventListener;
 import com.midnightmunchies.domain.ord.OrderRepository;
 import com.midnightmunchies.domain.ord.OrderStatus;
-import com.midnightmunchies.domain.ord.Restaurant;
+import com.midnightmunchies.domain.geo.MontrealServiceArea;
 import com.midnightmunchies.domain.ord.RestaurantRepository;
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
@@ -346,7 +346,7 @@ public class CourierService implements OrderEventListener {
     }
 
     private static Location startingLocation(UUID courierId) {
-        Restaurant.Position position = Restaurant.defaultPositionFor(courierId);
+        MontrealServiceArea.Place position = MontrealServiceArea.placeFor(courierId);
         return new Location(position.latitude(), position.longitude());
     }
 
