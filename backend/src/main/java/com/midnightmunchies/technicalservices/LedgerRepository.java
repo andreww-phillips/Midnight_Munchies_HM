@@ -30,6 +30,9 @@ public class LedgerRepository {
                 || previous.totalCharge().compareTo(entry.totalCharge()) != 0)) {
             throw new IllegalArgumentException("A recorded charge cannot be changed or removed");
         }
+        if (previous != null && previous.charge() != null && !previous.charge().equals(entry.charge())) {
+            throw new IllegalArgumentException("A recorded charge breakdown cannot be changed or removed");
+        }
         entries.put(entry.orderId(), entry);
         return entry;
     }

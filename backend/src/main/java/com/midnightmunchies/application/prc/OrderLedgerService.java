@@ -6,6 +6,7 @@ import com.midnightmunchies.domain.ord.OrderEventListener;
 import com.midnightmunchies.domain.ord.OrderRepository;
 import com.midnightmunchies.domain.ord.OrderStatus;
 import com.midnightmunchies.domain.prc.LedgerEntry;
+import com.midnightmunchies.domain.prc.Charge;
 import com.midnightmunchies.domain.reg.UserRole;
 import com.midnightmunchies.technicalservices.LedgerRepository;
 import org.springframework.stereotype.Service;
@@ -63,7 +64,20 @@ public class OrderLedgerService implements OrderEventListener {
         }
         ledger.save(new LedgerEntry(previous.orderId(), previous.customerId(), previous.restaurantId(),
                 carriedBy, previous.orderLines(), advances ? event.toStatus() : previous.status(),
-                previous.createdAt(), times, previous.totalCharge()));
+                previous.createdAt(), times, previous.totalCharge(), previous.charge()));
+    }
+
+    /** Records pricing facts against the latest snapshot under the same lock as event updates. */
+    public synchronized LedgerEntry recordCharge(UUID orderId, Charge charge) {
+        Objects.requireNonNull(charge, "charge must not be null");
+        LedgerEntry previous = ledger.findByOrderId(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order does not exist"));
+        if (previous.status() != OrderStatus.DELIVERED) {
+            throw new IllegalArgumentException("Only a delivered order can receive a charge");
+        }
+        return ledger.save(new LedgerEntry(previous.orderId(), previous.customerId(), previous.restaurantId(),
+                previous.courierId(), previous.orderLines(), previous.status(), previous.createdAt(),
+                previous.timestamps(), charge.total(), charge));
     }
 
     private LedgerEntry placement(Order order) {

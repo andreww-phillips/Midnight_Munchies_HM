@@ -67,6 +67,10 @@ public final class OrderSummary {
         return order.totalCharge();
     }
 
+    public Charge getCharge() {
+        return order.charge();
+    }
+
     public boolean isPricingPending() {
         return order.totalCharge() == null;
     }

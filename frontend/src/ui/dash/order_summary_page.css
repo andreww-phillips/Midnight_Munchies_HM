@@ -50,3 +50,15 @@
   margin-bottom: 8px;
   color: var(--text-h);
 }
+
+.order-summary .order-summary-breakdown {
+  margin: 0 0 16px;
+}
+
+.order-summary .order-summary-breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}

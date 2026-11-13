@@ -26,8 +26,17 @@ public record LedgerEntry(
         OrderStatus status,
         Instant createdAt,
         Map<OrderStatus, Instant> timestamps,
-        BigDecimal totalCharge
+        BigDecimal totalCharge,
+        Charge charge
 ) implements HistoryEntry {
+
+    /** Compatibility for unpriced records and totals recorded without a fee breakdown. */
+    public LedgerEntry(UUID orderId, UUID customerId, UUID restaurantId, UUID courierId,
+                       List<OrderLine> orderLines, OrderStatus status, Instant createdAt,
+                       Map<OrderStatus, Instant> timestamps, BigDecimal totalCharge) {
+        this(orderId, customerId, restaurantId, courierId, orderLines, status, createdAt,
+                timestamps, totalCharge, null);
+    }
 
     public LedgerEntry {
         Objects.requireNonNull(orderId, "orderId must not be null");
@@ -51,6 +60,11 @@ public record LedgerEntry(
         }
         if (totalCharge != null && totalCharge.signum() < 0) {
             throw new IllegalArgumentException("totalCharge must not be negative");
+        }
+        if (charge != null) {
+            if (totalCharge == null || charge.total().compareTo(totalCharge) != 0) {
+                throw new IllegalArgumentException("Recorded charge must match totalCharge");
+            }
         }
     }
 }

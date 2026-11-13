@@ -60,6 +60,12 @@ function DeliverySummary({ orderId }) {
             {line.quantity} × {line.menuItemName || 'Menu item'} · {formatPrice(line.unitPrice)} each
           </li>)}
         </ul>
+        {!pricingPending && summary.charge && <dl className="order-summary-breakdown" aria-label="Charge breakdown">
+          <div><dt>Items subtotal</dt><dd>{formatPrice(summary.charge.itemSubtotal)}</dd></div>
+          <div><dt>Delivery fee</dt><dd>{formatPrice(summary.charge.deliveryFee)}</dd></div>
+          <div><dt>Service fee</dt><dd>{formatPrice(summary.charge.serviceFee)}</dd></div>
+          <div><dt>Small-order surcharge</dt><dd>{formatPrice(summary.charge.smallOrderSurcharge)}</dd></div>
+        </dl>}
         <p className="order-summary-total"><strong>Total charge: </strong>
           {pricingPending ? <span>Pricing pending</span> : <span>{formatPrice(summary.totalCharge)}</span>}
         </p>

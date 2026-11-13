@@ -181,3 +181,27 @@ it('shows the original charge on a future refunded summary', async () => {
   expect(container.querySelector('dd').textContent).toBe('Refunded');
   expect(container.querySelector('.order-summary-total').textContent).toContain('$30.70');
 });
+
+it('displays the recorded fee breakdown without calculating fees in the browser', async () => {
+  api.orderSummary.mockResolvedValue({ ...summary, totalCharge: '30.70', pricingPending: false,
+    charge: { itemSubtotal: '24.70', deliveryFee: '3.00', serviceFee: '2.00', smallOrderSurcharge: '1.00', total: '30.70' }
+  });
+  await render();
+
+  const rows = [...container.querySelectorAll('[aria-label="Charge breakdown"] > div')]
+    .map((row) => [row.querySelector('dt').textContent, row.querySelector('dd').textContent]);
+  expect(rows).toEqual([
+    ['Items subtotal', '$24.70'], ['Delivery fee', '$3.00'], ['Service fee', '$2.00'], ['Small-order surcharge', '$1.00']
+  ]);
+  expect(container.querySelector('.order-summary-total').textContent).toContain('$30.70');
+});
+
+it('displays recorded zero fees and surcharge rather than omitting them', async () => {
+  api.orderSummary.mockResolvedValue({ ...summary, totalCharge: '24.70', pricingPending: false,
+    charge: { itemSubtotal: '24.70', deliveryFee: '0', serviceFee: '0', smallOrderSurcharge: '0', total: '24.70' }
+  });
+  await render();
+
+  expect([...container.querySelectorAll('[aria-label="Charge breakdown"] dd')].map((cell) => cell.textContent))
+    .toEqual(['$24.70', '$0.00', '$0.00', '$0.00']);
+});
