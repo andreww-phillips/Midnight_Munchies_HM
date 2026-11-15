@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.midnightmunchies.domain.ord.OrderStatus;
 import com.midnightmunchies.domain.prc.Charge;
 import com.midnightmunchies.domain.prc.LedgerEntry;
+import com.midnightmunchies.domain.prc.Refund;
 import com.midnightmunchies.domain.reg.UserRole;
 
 import java.math.BigDecimal;
@@ -29,7 +30,7 @@ public record OrderHistoryResponse(
         timestamps = Map.copyOf(timestamps);
     }
 
-    static OrderHistoryResponse from(LedgerEntry entry, UserRole role) {
+    static OrderHistoryResponse from(LedgerEntry entry, UserRole role, List<Refund> refunds) {
         boolean courier = role == UserRole.COURIER;
         boolean canViewBilling = role == UserRole.CUSTOMER || role == UserRole.PLATFORM_OPERATOR;
         List<Line> lines = entry.orderLines().stream()
@@ -37,7 +38,7 @@ public record OrderHistoryResponse(
                         courier ? null : line.getUnitPrice()))
                 .toList();
         Billing billing = canViewBilling
-                ? new Billing(entry.totalCharge(), entry.charge(), entry.totalCharge() == null) : null;
+                ? new Billing(entry.totalCharge(), entry.charge(), entry.totalCharge() == null, refunds) : null;
         return new OrderHistoryResponse(entry.orderId(), entry.customerId(), entry.restaurantId(),
                 entry.courierId(), lines, entry.status(), entry.createdAt(), entry.timestamps(), billing);
     }
@@ -47,6 +48,9 @@ public record OrderHistoryResponse(
     }
 
     /** A null total means unrecorded pricing; a recorded zero is a real charge. */
-    public record Billing(BigDecimal totalCharge, Charge charge, boolean pricingPending) {
+    public record Billing(BigDecimal totalCharge, Charge charge, boolean pricingPending, List<Refund> refunds) {
+        public Billing {
+            refunds = List.copyOf(refunds);
+        }
     }
 }

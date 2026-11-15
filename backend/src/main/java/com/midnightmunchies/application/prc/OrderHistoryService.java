@@ -31,17 +31,27 @@ public class OrderHistoryService {
 
     public List<OrderHistoryResponse> getHistory(UserAccount account) {
         requireAuthenticated(account);
-        return authorizedEntries(account, ledger.findAll()).stream()
-                .map(entry -> OrderHistoryResponse.from(entry, account.role()))
-                .toList();
+        // Refund commits use this same lock: read each order and its refund as one snapshot.
+        synchronized (ledger) {
+            return authorizedEntries(account, ledger.findAll()).stream()
+                    .map(entry -> response(entry, account.role()))
+                    .toList();
+        }
     }
 
     /** Missing and unauthorized orders are deliberately indistinguishable. */
     public Optional<OrderHistoryResponse> findOrder(UUID orderId, UserAccount account) {
         requireAuthenticated(account);
-        return authorizedEntries(account, ledger.findByOrderId(orderId).stream().toList()).stream()
-                .map(entry -> OrderHistoryResponse.from(entry, account.role()))
-                .findFirst();
+        synchronized (ledger) {
+            return authorizedEntries(account, ledger.findByOrderId(orderId).stream().toList()).stream()
+                    .map(entry -> response(entry, account.role()))
+                    .findFirst();
+        }
+    }
+
+    /** Attach transactions only after the parent order passes its existing history strategy. */
+    private OrderHistoryResponse response(LedgerEntry entry, UserRole role) {
+        return OrderHistoryResponse.from(entry, role, ledger.findRefundByOrderId(entry.orderId()).stream().toList());
     }
 
     private List<LedgerEntry> authorizedEntries(UserAccount account, List<LedgerEntry> entries) {

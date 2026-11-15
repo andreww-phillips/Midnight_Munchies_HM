@@ -49,7 +49,8 @@ class OrderHistoryControllerTests {
     private static final Charge CHARGE = new Charge(new BigDecimal("24.70"), new BigDecimal("3.99"),
             new BigDecimal("1.50"), new BigDecimal("0.00"), new BigDecimal("30.19"));
     private static final Set<String> BILLING_FIELDS = Set.of("billing", "unitPrice", "totalCharge", "charge",
-            "itemSubtotal", "deliveryFee", "serviceFee", "smallOrderSurcharge", "pricingPending");
+            "itemSubtotal", "deliveryFee", "serviceFee", "smallOrderSurcharge", "pricingPending",
+            "refund", "refunds", "refundId", "amount", "operatorId", "refundedAt");
 
     @Autowired private MockMvc mvc;
     @Autowired private AuthService auth;

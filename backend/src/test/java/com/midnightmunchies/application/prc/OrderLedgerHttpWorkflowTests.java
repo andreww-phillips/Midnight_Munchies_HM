@@ -145,6 +145,9 @@ class OrderLedgerHttpWorkflowTests {
         LedgerEntry charged = record(scenario);
         SessionUser operator = login("operator@example.com", "password");
 
+        mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.billing.refunds").isEmpty());
+
         mvc.perform(post("/api/prc/orders/{id}/refund", scenario.orderId()).session(operator.session()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUNDED"))
                 .andExpect(jsonPath("$.refund.amount").value(30.19))
@@ -162,6 +165,21 @@ class OrderLedgerHttpWorkflowTests {
         assertEquals(charged.totalCharge(), record(scenario).totalCharge());
         assertEquals(new BigDecimal("30.19"), ledger.findRefundByOrderId(UUID.fromString(scenario.orderId()))
                 .orElseThrow().amount());
+        for (SessionUser viewer : List.of(scenario.customer(), operator)) {
+            mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(viewer.session()))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUNDED"))
+                    .andExpect(jsonPath("$.billing.totalCharge").value(30.19))
+                    .andExpect(jsonPath("$.billing.refunds[0].orderId").value(scenario.orderId()))
+                    .andExpect(jsonPath("$.billing.refunds[0].amount").value(30.19));
+        }
+        for (SessionUser viewer : List.of(scenario.staff(), courier)) {
+            mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(viewer.session()))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUNDED"))
+                    .andExpect(jsonPath("$.billing").doesNotHaveJsonPath());
+        }
+        SessionUser otherCustomer = registerAndLogin(UserRole.CUSTOMER);
+        mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(otherCustomer.session()))
+                .andExpect(status().isNotFound());
         setDuty(courier, false);
     }
 
