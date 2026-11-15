@@ -115,6 +115,7 @@ function History({ refreshVersion, user, onSessionExpired }) {
           && billing?.totalCharge != null && !billing.pricingPending && refunds.length === 0;
         return <article className="order-card" key={order.orderId}>
           <h4>Order #{order.orderId.slice(0, 8)} · {order.status}</h4>
+          {order.status === 'REJECTED' && order.rejectionReason && <p>Rejection reason: {order.rejectionReason}</p>}
           <p className="muted">Restaurant: {order.restaurantId}</p>
           <ul>{order.orderLines.map((line, index) => (
             <li key={`${line.menuItemId}-${index}`}>

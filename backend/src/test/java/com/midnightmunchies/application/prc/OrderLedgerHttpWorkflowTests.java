@@ -207,6 +207,31 @@ class OrderLedgerHttpWorkflowTests {
         }
     }
 
+    @Test
+    void customerHistoryShowsTheStoredRejectionReasonWithoutExposingItToAnotherCustomer() throws Exception {
+        Scenario scenario = place("8.50", 1);
+        mvc.perform(get("/api/prc/history").session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].rejectionReason").doesNotHaveJsonPath());
+
+        mvc.perform(post("/api/ord/restaurants/{id}/orders/{orderId}/reject", scenario.restaurantId(), scenario.orderId())
+                        .session(scenario.staff().session()).contentType(APPLICATION_JSON)
+                        .content(JSON.writeValueAsString(Map.of("reason", "  Kitchen unavailable  "))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
+
+        mvc.perform(get("/api/prc/history").session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].orderId").value(scenario.orderId()))
+                .andExpect(jsonPath("$[0].status").value("REJECTED"))
+                .andExpect(jsonPath("$[0].rejectionReason").value("Kitchen unavailable"));
+        mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.rejectionReason").value("Kitchen unavailable"));
+
+        SessionUser other = registerAndLogin(UserRole.CUSTOMER);
+        mvc.perform(get("/api/prc/history").session(other.session()))
+                .andExpect(status().isOk()).andExpect(content().json("[]"));
+        mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(other.session()))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.rejectionReason").doesNotHaveJsonPath());
+    }
+
     private Scenario place(String price, int quantity) throws Exception {
         SessionUser staff = registerAndLogin(UserRole.RESTAURANT_STAFF);
         SessionUser customer = registerAndLogin(UserRole.CUSTOMER);

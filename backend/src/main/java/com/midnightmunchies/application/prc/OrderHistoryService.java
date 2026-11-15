@@ -2,6 +2,9 @@ package com.midnightmunchies.application.prc;
 
 import com.midnightmunchies.application.reg.AuthenticationRequiredException;
 import com.midnightmunchies.domain.ord.RestaurantRepository;
+import com.midnightmunchies.domain.ord.Order;
+import com.midnightmunchies.domain.ord.OrderRepository;
+import com.midnightmunchies.domain.ord.OrderStatus;
 import com.midnightmunchies.domain.prc.HistorySession;
 import com.midnightmunchies.domain.prc.LedgerEntry;
 import com.midnightmunchies.domain.reg.UserAccount;
@@ -22,11 +25,14 @@ public class OrderHistoryService {
     private final LedgerRepository ledger;
     private final RestaurantRepository restaurants;
     private final HistoryService history;
+    private final OrderRepository orders;
 
-    public OrderHistoryService(LedgerRepository ledger, RestaurantRepository restaurants, HistoryService history) {
+    public OrderHistoryService(LedgerRepository ledger, RestaurantRepository restaurants, HistoryService history,
+                               OrderRepository orders) {
         this.ledger = ledger;
         this.restaurants = restaurants;
         this.history = history;
+        this.orders = orders;
     }
 
     public List<OrderHistoryResponse> getHistory(UserAccount account) {
@@ -51,7 +57,10 @@ public class OrderHistoryService {
 
     /** Attach transactions only after the parent order passes its existing history strategy. */
     private OrderHistoryResponse response(LedgerEntry entry, UserRole role) {
-        return OrderHistoryResponse.from(entry, role, ledger.findRefundByOrderId(entry.orderId()).stream().toList());
+        String rejectionReason = entry.status() == OrderStatus.REJECTED
+                ? orders.findById(entry.orderId()).map(Order::getRejectionReason).orElse(null) : null;
+        return OrderHistoryResponse.from(entry, role, ledger.findRefundByOrderId(entry.orderId()).stream().toList(),
+                rejectionReason);
     }
 
     private List<LedgerEntry> authorizedEntries(UserAccount account, List<LedgerEntry> entries) {

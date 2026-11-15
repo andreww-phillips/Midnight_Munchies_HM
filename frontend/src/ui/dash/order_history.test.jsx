@@ -127,6 +127,16 @@ it('passes the logged-in customer through the existing restaurant library to the
   expect(container.querySelector('.order-summary').textContent).toContain('Pricing pending');
 });
 
+it('shows the restaurant rejection reason in the customer history and inline order list', async () => {
+  api.orderHistory.mockResolvedValue([{ ...order, status: 'REJECTED', rejectionReason: 'Kitchen unavailable' }]);
+  await render();
+  expect(container.querySelector('.order-card').textContent).toContain('Rejection reason: Kitchen unavailable');
+  expect(api.orderSummary).not.toHaveBeenCalled();
+
+  await act(async () => root.render(<RestaurantList user={customer} />));
+  expect(container.querySelector('.order-card').textContent).toContain('Rejection reason: Kitchen unavailable');
+});
+
 const operator = { id: 'operator-1', role: 'PLATFORM_OPERATOR' };
 const paid = { ...order, billing: { totalCharge: '30.19', pricingPending: false, refunds: [] } };
 const credit = { refundId: 'refund-1', orderId: order.orderId, amount: '30.19',

@@ -23,14 +23,15 @@ public record OrderHistoryResponse(
         OrderStatus status,
         Instant createdAt,
         Map<OrderStatus, Instant> timestamps,
-        @JsonInclude(JsonInclude.Include.NON_NULL) Billing billing
+        @JsonInclude(JsonInclude.Include.NON_NULL) Billing billing,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String rejectionReason
 ) {
     public OrderHistoryResponse {
         orderLines = List.copyOf(orderLines);
         timestamps = Map.copyOf(timestamps);
     }
 
-    static OrderHistoryResponse from(LedgerEntry entry, UserRole role, List<Refund> refunds) {
+    static OrderHistoryResponse from(LedgerEntry entry, UserRole role, List<Refund> refunds, String rejectionReason) {
         boolean courier = role == UserRole.COURIER;
         boolean canViewBilling = role == UserRole.CUSTOMER || role == UserRole.PLATFORM_OPERATOR;
         List<Line> lines = entry.orderLines().stream()
@@ -40,7 +41,7 @@ public record OrderHistoryResponse(
         Billing billing = canViewBilling
                 ? new Billing(entry.totalCharge(), entry.charge(), entry.totalCharge() == null, refunds) : null;
         return new OrderHistoryResponse(entry.orderId(), entry.customerId(), entry.restaurantId(),
-                entry.courierId(), lines, entry.status(), entry.createdAt(), entry.timestamps(), billing);
+                entry.courierId(), lines, entry.status(), entry.createdAt(), entry.timestamps(), billing, rejectionReason);
     }
 
     public record Line(UUID menuItemId, String menuItemName, int quantity,
