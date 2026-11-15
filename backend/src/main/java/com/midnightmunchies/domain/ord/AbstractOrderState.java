@@ -34,6 +34,11 @@ abstract class AbstractOrderState implements OrderState {
 	}
 
 	@Override
+	public OrderState refund() {
+		throw illegal("refund");
+	}
+
+	@Override
 	public OrderState cancel() {
 		throw illegal("cancel");
 	}

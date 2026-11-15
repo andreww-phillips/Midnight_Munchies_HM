@@ -136,6 +136,36 @@ class OrderLedgerHttpWorkflowTests {
     }
 
     @Test
+    void operatorCanRefundARealDeliveryWhilePreservingItsConfiguredChargeAndSummary() throws Exception {
+        Scenario scenario = place("12.35", 2);
+        SessionUser courier = registerAndLogin(UserRole.COURIER);
+        setDuty(courier, true);
+        prepare(scenario);
+        completeDelivery(scenario, courier);
+        LedgerEntry charged = record(scenario);
+        SessionUser operator = login("operator@example.com", "password");
+
+        mvc.perform(post("/api/prc/orders/{id}/refund", scenario.orderId()).session(operator.session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUNDED"))
+                .andExpect(jsonPath("$.refund.amount").value(30.19))
+                .andExpect(jsonPath("$.refund.operatorId").value(operator.id()));
+        mvc.perform(get("/api/ord/orders").session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("REFUNDED"));
+        mvc.perform(get(SUMMARY, scenario.orderId()).session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUNDED"))
+                .andExpect(jsonPath("$.totalCharge").value(30.19))
+                .andExpect(jsonPath("$.charge.deliveryFee").value(3.99));
+        mvc.perform(get("/api/ord/orders/{id}/events", scenario.orderId()).session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[5].toStatus").value("REFUNDED"))
+                .andExpect(jsonPath("$[5].actorRole").value("PLATFORM_OPERATOR"));
+        assertSame(charged.charge(), record(scenario).charge());
+        assertEquals(charged.totalCharge(), record(scenario).totalCharge());
+        assertEquals(new BigDecimal("30.19"), ledger.findRefundByOrderId(UUID.fromString(scenario.orderId()))
+                .orElseThrow().amount());
+        setDuty(courier, false);
+    }
+
+    @Test
     void rejectedAndCancelledOrdersRemainInTheLedgerWithoutChargesOrDeliverySummaries() throws Exception {
         Scenario rejected = place("8.50", 1);
         mvc.perform(post("/api/ord/restaurants/{id}/orders/{orderId}/reject", rejected.restaurantId(), rejected.orderId())

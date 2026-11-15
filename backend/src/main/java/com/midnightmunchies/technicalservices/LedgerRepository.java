@@ -2,6 +2,7 @@ package com.midnightmunchies.technicalservices;
 
 import com.midnightmunchies.domain.prc.LedgerEntry;
 import com.midnightmunchies.domain.prc.Refund;
+import com.midnightmunchies.domain.ord.OrderStatus;
 import org.springframework.stereotype.Repository;
 
 import java.util.Comparator;
@@ -85,6 +86,35 @@ public class LedgerRepository {
     public synchronized Optional<Refund> findRefundByOrderId(UUID orderId) {
         Objects.requireNonNull(orderId, "orderId must not be null");
         return Optional.ofNullable(refundsByOrderId.get(orderId));
+    }
+
+    /**
+     * Commits refund facts and the matching projection together. Required event recording
+     * runs last; any failure restores both maps before releasing the repository lock.
+     * The caller coordinates this with the authoritative ORD save.
+     */
+    public synchronized void commitRefund(Refund refund, LedgerEntry refundedOrder, Runnable recordEvent) {
+        Objects.requireNonNull(refund, "refund must not be null");
+        Objects.requireNonNull(refundedOrder, "refundedOrder must not be null");
+        Objects.requireNonNull(recordEvent, "recordEvent must not be null");
+        if (!refund.orderId().equals(refundedOrder.orderId())
+                || refundedOrder.status() != OrderStatus.REFUNDED
+                || !refund.refundedAt().equals(refundedOrder.timestamps().get(OrderStatus.REFUNDED))) {
+            throw new IllegalArgumentException("Refund must match the refunded order snapshot");
+        }
+        LedgerEntry previous = entries.get(refund.orderId());
+        Refund previousRefund = refundsByOrderId.get(refund.orderId());
+        try {
+            appendRefund(refund);
+            save(refundedOrder);
+            recordEvent.run();
+        } catch (RuntimeException failure) {
+            if (previous == null) entries.remove(refund.orderId());
+            else entries.put(refund.orderId(), previous);
+            if (previousRefund == null) refundsByOrderId.remove(refund.orderId());
+            else refundsByOrderId.put(refund.orderId(), previousRefund);
+            throw failure;
+        }
     }
 
     /** Returns an unmodifiable snapshot, oldest refund first, with refund ID breaking time ties. */

@@ -20,5 +20,7 @@ interface OrderState {
 
 	OrderState confirmDelivery();
 
+	OrderState refund();
+
 	OrderState cancel();
 }
