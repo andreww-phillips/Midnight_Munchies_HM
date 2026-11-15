@@ -99,6 +99,10 @@ public final class Order {
 		transitionTo(state.confirmDelivery());
 	}
 
+	public void refund() {
+		transitionTo(state.refund());
+	}
+
 	public void cancel() {
 		transitionTo(state.cancel());
 	}

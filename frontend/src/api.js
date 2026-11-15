@@ -62,6 +62,8 @@ export const api = {
     body: JSON.stringify({ lines })
   }),
   orders: () => request("/api/ord/orders"),
+  orderHistory: () => request("/api/prc/history"),
+  refundOrder: (orderId) => request(`/api/prc/orders/${orderId}/refund`, { method: "POST" }),
   orderSummary: (orderId) => request(`/api/prc/orders/${orderId}/summary`),
   preparationQueue: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/preparation`),
   acceptOrder: (restaurantId, orderId) => request(`/api/ord/restaurants/${restaurantId}/orders/${orderId}/accept`, {

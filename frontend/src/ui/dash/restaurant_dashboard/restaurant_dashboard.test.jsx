@@ -7,7 +7,7 @@ import RestaurantDashboard from './restaurant_dashboard';
 import RegistrationPage from '../registration_page/registration_page';
 
 vi.mock('../../../api', () => ({ api: {
-  currentUser: vi.fn(), restaurants: vi.fn(), orders: vi.fn(), preparationQueue: vi.fn(), menu: vi.fn(),
+  currentUser: vi.fn(), restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn(), preparationQueue: vi.fn(), menu: vi.fn(),
   acceptOrder: vi.fn(), rejectOrder: vi.fn(), startNextPreparation: vi.fn(), markOrderReady: vi.fn()
 } }));
 
@@ -37,6 +37,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   api.orders.mockResolvedValue([]);
+  api.orderHistory.mockResolvedValue([]);
   api.preparationQueue.mockResolvedValue([]);
   api.menu.mockResolvedValue([]);
   container = document.createElement('div');

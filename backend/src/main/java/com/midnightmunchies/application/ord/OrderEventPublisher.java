@@ -25,8 +25,16 @@ public class OrderEventPublisher {
     }
 
     public void publish(OrderEvent event) {
+        publishExcept(event, null);
+    }
+
+    /** Notifies remaining observers after a required listener has completed during a commit. */
+    public void publishExcept(OrderEvent event, OrderEventListener completedListener) {
         Objects.requireNonNull(event, "event must not be null");
         for (OrderEventListener listener : listeners) {
+            if (listener == completedListener) {
+                continue;
+            }
             try {
                 listener.onEvent(event);
             } catch (RuntimeException exception) {

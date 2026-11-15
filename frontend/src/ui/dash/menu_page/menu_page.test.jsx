@@ -10,7 +10,7 @@ vi.mock("../../../api", () => ({
   api: {
     menu: vi.fn(), addMenuItem: vi.fn(), editMenuItem: vi.fn(), removeMenuItem: vi.fn(),
     changeMenuItemAvailability: vi.fn(), placeOrder: vi.fn(),
-    currentUser: vi.fn(), restaurants: vi.fn(), orders: vi.fn()
+    currentUser: vi.fn(), restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn()
   }
 }));
 
@@ -291,6 +291,7 @@ describe("active application integration", () => {
   beforeEach(() => {
     api.restaurants.mockResolvedValue([restaurant, { ...restaurant, id: "restaurant-2", ownerId: "other-owner", name: "Other Diner" }]);
     api.orders.mockResolvedValue([]);
+  api.orderHistory.mockResolvedValue([]);
   });
 
   it("uses the restored session and hides management when staff selects another restaurant", async () => {
@@ -308,7 +309,7 @@ describe("active application integration", () => {
     api.currentUser.mockResolvedValue(customer);
     const placed = { id: "order-12345678", status: "PLACED", orderLines: [{ menuItemId: available.id, menuItemName: "Poutine", quantity: 1, unitPrice: "12.35" }] };
     api.placeOrder.mockResolvedValue(placed);
-    api.orders.mockResolvedValueOnce([]).mockResolvedValue([placed]);
+    api.orderHistory.mockResolvedValueOnce([]).mockResolvedValue([{ ...placed, orderId: placed.id }]);
     await act(async () => root.render(<RegistrationPage />));
     await click(container.querySelector(".restaurant-card button"));
     await click(button("Add one Poutine"));

@@ -66,7 +66,7 @@ function DeliverySummary({ orderId }) {
           <div><dt>Service fee</dt><dd>{formatPrice(summary.charge.serviceFee)}</dd></div>
           <div><dt>Small-order surcharge</dt><dd>{formatPrice(summary.charge.smallOrderSurcharge)}</dd></div>
         </dl>}
-        <p className="order-summary-total"><strong>Total charge: </strong>
+        <p className="order-summary-total"><strong>{summary.status === 'REFUNDED' ? 'Original charge: ' : 'Total charge: '}</strong>
           {pricingPending ? <span>Pricing pending</span> : <span>{formatPrice(summary.totalCharge)}</span>}
         </p>
         {pricingPending && <p className="muted">Your delivery is complete. The final charge is not available yet.</p>}

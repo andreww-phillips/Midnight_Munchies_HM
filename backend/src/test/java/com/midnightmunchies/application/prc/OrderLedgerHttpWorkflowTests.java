@@ -136,6 +136,54 @@ class OrderLedgerHttpWorkflowTests {
     }
 
     @Test
+    void operatorCanRefundARealDeliveryWhilePreservingItsConfiguredChargeAndSummary() throws Exception {
+        Scenario scenario = place("12.35", 2);
+        SessionUser courier = registerAndLogin(UserRole.COURIER);
+        setDuty(courier, true);
+        prepare(scenario);
+        completeDelivery(scenario, courier);
+        LedgerEntry charged = record(scenario);
+        SessionUser operator = login("operator@example.com", "password");
+
+        mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.billing.refunds").isEmpty());
+
+        mvc.perform(post("/api/prc/orders/{id}/refund", scenario.orderId()).session(operator.session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUNDED"))
+                .andExpect(jsonPath("$.refund.amount").value(30.19))
+                .andExpect(jsonPath("$.refund.operatorId").value(operator.id()));
+        mvc.perform(get("/api/ord/orders").session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("REFUNDED"));
+        mvc.perform(get(SUMMARY, scenario.orderId()).session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUNDED"))
+                .andExpect(jsonPath("$.totalCharge").value(30.19))
+                .andExpect(jsonPath("$.charge.deliveryFee").value(3.99));
+        mvc.perform(get("/api/ord/orders/{id}/events", scenario.orderId()).session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[5].toStatus").value("REFUNDED"))
+                .andExpect(jsonPath("$[5].actorRole").value("PLATFORM_OPERATOR"));
+        assertSame(charged.charge(), record(scenario).charge());
+        assertEquals(charged.totalCharge(), record(scenario).totalCharge());
+        assertEquals(new BigDecimal("30.19"), ledger.findRefundByOrderId(UUID.fromString(scenario.orderId()))
+                .orElseThrow().amount());
+        for (SessionUser viewer : List.of(scenario.customer(), operator)) {
+            mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(viewer.session()))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUNDED"))
+                    .andExpect(jsonPath("$.billing.totalCharge").value(30.19))
+                    .andExpect(jsonPath("$.billing.refunds[0].orderId").value(scenario.orderId()))
+                    .andExpect(jsonPath("$.billing.refunds[0].amount").value(30.19));
+        }
+        for (SessionUser viewer : List.of(scenario.staff(), courier)) {
+            mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(viewer.session()))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REFUNDED"))
+                    .andExpect(jsonPath("$.billing").doesNotHaveJsonPath());
+        }
+        SessionUser otherCustomer = registerAndLogin(UserRole.CUSTOMER);
+        mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(otherCustomer.session()))
+                .andExpect(status().isNotFound());
+        setDuty(courier, false);
+    }
+
+    @Test
     void rejectedAndCancelledOrdersRemainInTheLedgerWithoutChargesOrDeliverySummaries() throws Exception {
         Scenario rejected = place("8.50", 1);
         mvc.perform(post("/api/ord/restaurants/{id}/orders/{orderId}/reject", rejected.restaurantId(), rejected.orderId())
@@ -157,6 +205,31 @@ class OrderLedgerHttpWorkflowTests {
             mvc.perform(get(SUMMARY, scenario.orderId()).session(scenario.customer().session()))
                     .andExpect(status().isConflict());
         }
+    }
+
+    @Test
+    void customerHistoryShowsTheStoredRejectionReasonWithoutExposingItToAnotherCustomer() throws Exception {
+        Scenario scenario = place("8.50", 1);
+        mvc.perform(get("/api/prc/history").session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].rejectionReason").doesNotHaveJsonPath());
+
+        mvc.perform(post("/api/ord/restaurants/{id}/orders/{orderId}/reject", scenario.restaurantId(), scenario.orderId())
+                        .session(scenario.staff().session()).contentType(APPLICATION_JSON)
+                        .content(JSON.writeValueAsString(Map.of("reason", "  Kitchen unavailable  "))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
+
+        mvc.perform(get("/api/prc/history").session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].orderId").value(scenario.orderId()))
+                .andExpect(jsonPath("$[0].status").value("REJECTED"))
+                .andExpect(jsonPath("$[0].rejectionReason").value("Kitchen unavailable"));
+        mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(scenario.customer().session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.rejectionReason").value("Kitchen unavailable"));
+
+        SessionUser other = registerAndLogin(UserRole.CUSTOMER);
+        mvc.perform(get("/api/prc/history").session(other.session()))
+                .andExpect(status().isOk()).andExpect(content().json("[]"));
+        mvc.perform(get("/api/prc/history/{id}", scenario.orderId()).session(other.session()))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.rejectionReason").doesNotHaveJsonPath());
     }
 
     private Scenario place(String price, int quantity) throws Exception {

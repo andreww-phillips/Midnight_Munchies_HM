@@ -7,7 +7,8 @@ import { api } from '../../../api';
 
 vi.mock('../../../api', () => ({ api: {
   currentUser: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(),
-  restaurants: vi.fn(), orders: vi.fn(), menu: vi.fn(), addMenuItem: vi.fn(), cityMap: vi.fn(), preparationQueue: vi.fn()
+  restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn(), menu: vi.fn(), addMenuItem: vi.fn(), cityMap: vi.fn(), preparationQueue: vi.fn(),
+  courierDashboard: vi.fn(), operatorDeliveries: vi.fn()
 } }));
 
 let container;
@@ -18,6 +19,9 @@ beforeEach(() => {
   api.currentUser.mockRejectedValue(Object.assign(new Error('Please log in to continue.'), { status: 401 }));
   api.restaurants.mockResolvedValue([]);
   api.orders.mockResolvedValue([]);
+  api.orderHistory.mockResolvedValue([]);
+  api.courierDashboard.mockResolvedValue({ onDuty: false, state: 'OFFLINE', assignment: null });
+  api.operatorDeliveries.mockResolvedValue({ active: [], queued: [] });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -49,6 +53,30 @@ async function registerAs(role) {
   await change('username', `${role}@example.com`);
   await change('password', 'password');
 }
+
+it.each([
+  ['CUSTOMER', 'Your orders'],
+  ['RESTAURANT_STAFF', 'Restaurant order history'],
+  ['COURIER', 'Your delivery history'],
+  ['PLATFORM_OPERATOR', 'All orders and billing']
+])('opens Pricing & History for %s using the authenticated session', async (role, title) => {
+  api.currentUser.mockResolvedValue({ id: 'history-viewer', username: 'history@example.com', role });
+  await act(async () => root.render(<RegistrationPage />));
+  await click(button('Pricing & History'));
+  expect(container.querySelector('.order-history h2').textContent).toBe(title);
+  expect(api.orderHistory).toHaveBeenCalledWith();
+  expect(api.orderHistory.mock.calls.every((args) => args.length === 0)).toBe(true);
+});
+
+it('returns to login when a courier history session expires', async () => {
+  api.currentUser.mockResolvedValue({ id: 'courier-history', username: 'courier@example.com', role: 'COURIER' });
+  await act(async () => root.render(<RegistrationPage />));
+  api.orderHistory.mockRejectedValue(Object.assign(new Error('Authentication required'), { status: 401 }));
+  await click(button('Pricing & History'));
+  expect(container.querySelector('.auth-card')).not.toBeNull();
+  expect(container.querySelector('.order-history')).toBeNull();
+  expect(container.textContent).toContain('Your session expired. Please log in again.');
+});
 
 it.each([
   ['customer', 'CUSTOMER'],

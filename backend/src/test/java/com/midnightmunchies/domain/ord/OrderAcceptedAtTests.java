@@ -69,8 +69,6 @@ class OrderAcceptedAtTests {
 	void restoreRejectsInvalidStoredData() {
 		assertThrows(IllegalArgumentException.class, () -> Order.restore(UUID.randomUUID(), UUID.randomUUID(),
 				UUID.randomUUID(), List.of(line()), TIME, OrderStatus.ACCEPTED, null));
-		assertThrows(IllegalArgumentException.class, () -> Order.restore(UUID.randomUUID(), UUID.randomUUID(),
-				UUID.randomUUID(), List.of(line()), TIME, OrderStatus.REFUNDED, null));
 		assertThrows(NullPointerException.class, () -> Order.restore(UUID.randomUUID(), UUID.randomUUID(),
 				UUID.randomUUID(), List.of(line()), TIME, null, null));
 	}

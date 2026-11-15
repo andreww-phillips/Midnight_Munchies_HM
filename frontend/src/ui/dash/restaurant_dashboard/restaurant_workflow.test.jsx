@@ -6,7 +6,7 @@ import RegistrationPage from '../registration_page/registration_page';
 import { api } from '../../../api';
 
 vi.mock('../../../api', () => ({ api: {
-  currentUser: vi.fn(), login: vi.fn(), logout: vi.fn(), restaurants: vi.fn(), orders: vi.fn(),
+  currentUser: vi.fn(), login: vi.fn(), logout: vi.fn(), restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn(),
   preparationQueue: vi.fn(), acceptOrder: vi.fn(), rejectOrder: vi.fn(), startNextPreparation: vi.fn(),
   markOrderReady: vi.fn(), orderEvents: vi.fn()
 } }));
@@ -33,6 +33,7 @@ async function submit(form) {
 function snapshot(orders, queue = []) {
   // Script server responses explicitly; transition rules remain in the real backend tests.
   api.orders.mockResolvedValue(orders);
+  api.orderHistory.mockResolvedValue(orders.map((entry) => ({ ...entry, orderId: entry.id })));
   api.preparationQueue.mockResolvedValue(queue);
 }
 async function login(account = staff) {
@@ -49,6 +50,7 @@ beforeEach(async () => {
   api.logout.mockResolvedValue(null);
   api.restaurants.mockResolvedValue([restaurant, { id: 'foreign-restaurant', name: 'Other Diner', ownerId: 'other-staff' }]);
   snapshot([]);
+  api.orderHistory.mockResolvedValue([]);
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
