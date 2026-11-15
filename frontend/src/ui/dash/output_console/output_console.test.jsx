@@ -13,7 +13,7 @@ import OrderEventHistory from '../order_event_history';
 
 vi.mock('../../../api', () => ({ api: {
   currentUser: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(),
-  restaurants: vi.fn(), orders: vi.fn(), preparationQueue: vi.fn(), menu: vi.fn(),
+  restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn(), preparationQueue: vi.fn(), menu: vi.fn(),
   acceptOrder: vi.fn(), rejectOrder: vi.fn(), startNextPreparation: vi.fn(), markOrderReady: vi.fn(),
   placeOrder: vi.fn(), addMenuItem: vi.fn(), editMenuItem: vi.fn(), removeMenuItem: vi.fn(),
   changeMenuItemAvailability: vi.fn(), orderEvents: vi.fn()
@@ -62,6 +62,7 @@ beforeEach(() => {
   api.currentUser.mockRejectedValue(Object.assign(new Error('Authentication required'), { status: 401 }));
   api.restaurants.mockResolvedValue([restaurant]);
   api.orders.mockResolvedValue([]);
+  api.orderHistory.mockResolvedValue([]);
   api.preparationQueue.mockResolvedValue([]);
   api.menu.mockResolvedValue([item]);
   api.orderEvents.mockResolvedValue([]);
@@ -377,7 +378,7 @@ describe('command logging integration', () => {
     await act(async () => root.render(<RegistrationPage />));
     await click(button('Menu'));
     await click(button('Add one Fries'));
-    api.orders.mockRejectedValueOnce(new Error('Order history refresh unavailable'));
+    api.orderHistory.mockRejectedValueOnce(new Error('Order history refresh unavailable'));
     await click(container.querySelector('.order-button'));
     expect(entries()).toHaveLength(2);
     expect(entries()[0].textContent).toContain('Success · Place order');

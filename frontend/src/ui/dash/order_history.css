@@ -1,0 +1,9 @@
+.order-history .order-card { display: block; }
+.order-history .order-card > ul { margin: 12px 0; }
+.history-timestamps { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 16px 0; font-size: 13px; }
+.history-timestamps dt { font-weight: 650; color: var(--text-h); }
+.history-timestamps dd { margin: 4px 0 0; }
+.history-refunds { padding: 16px; border: 1px solid var(--border); border-radius: 10px; overflow-wrap: anywhere; }
+.history-refunds h5 { margin: 0 0 12px; font-size: 15px; color: var(--text-h); }
+.history-refunds p { margin: 6px 0; font-size: 14px; }
+.history-refund-button { margin-top: 16px; }

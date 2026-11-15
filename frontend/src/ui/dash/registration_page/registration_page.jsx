@@ -3,6 +3,7 @@ import RestaurantList from "../restaurant_library/restaurant_library.jsx";
 import CourierDashboard from "../courier_dashboard_page.jsx";
 import OperatorDashboard from "../operator_dashboard_page.jsx";
 import MapPage from "../map_page/map_page.jsx";
+import OrderHistory from "../order_history.jsx";
 import { api } from "../../../api";
 import { useCommandLog } from "../output_console/command_log";
 import { CommandLogProvider } from "../output_console/command_log_provider";
@@ -197,8 +198,13 @@ function RegistrationScreen() {
           <button type="button" aria-pressed={view === "map"}
             className={view === "map" ? "primary-button" : "secondary-button"}
             onClick={() => { setOpenRequest(null); setView("map"); }}>Map</button>
+          <button type="button" aria-pressed={view === "history"}
+            className={view === "history" ? "primary-button" : "secondary-button"}
+            onClick={() => { setOpenRequest(null); setView("history"); }}>Pricing &amp; History</button>
         </nav>
-        {view === "map" ? (
+        {view === "history" ? (
+          <OrderHistory user={user} onSessionExpired={handleSessionExpired} />
+        ) : view === "map" ? (
           <MapPage key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleSessionExpired}
             onOpenRestaurant={(restaurant, mode) => { setOpenRequest({ restaurantId: restaurant.id, view: mode }); setView("restaurants"); }} />
         ) : (
