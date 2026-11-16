@@ -43,6 +43,7 @@ describe("restaurant order API", () => {
 
   it.each([
     ["orders", () => api.orders(), "GET", "/api/ord/orders", undefined, []],
+    ["cancel", () => api.cancelOrder("order-1"), "POST", "/api/ord/orders/order-1/cancel", undefined, { id: "order-1", status: "CANCELLED" }],
     ["pause restaurant", () => api.changeRestaurantStatus("restaurant-1", "PAUSED"), "PATCH", "/api/ord/restaurants/restaurant-1/status", { status: "PAUSED" }, { status: "PAUSED" }],
     ["reopen restaurant", () => api.changeRestaurantStatus("restaurant-1", "OPEN"), "PATCH", "/api/ord/restaurants/restaurant-1/status", { status: "OPEN" }, { status: "OPEN" }],
     ["history", () => api.orderHistory(), "GET", "/api/prc/history", undefined, []],

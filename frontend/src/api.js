@@ -66,6 +66,7 @@ export const api = {
     body: JSON.stringify({ lines })
   }),
   orders: () => request("/api/ord/orders"),
+  cancelOrder: (orderId) => request(`/api/ord/orders/${orderId}/cancel`, { method: "POST" }),
   orderHistory: () => request("/api/prc/history"),
   refundOrder: (orderId) => request(`/api/prc/orders/${orderId}/refund`, { method: "POST" }),
   orderSummary: (orderId) => request(`/api/prc/orders/${orderId}/summary`),

@@ -17,6 +17,7 @@ export default function RestaurantList({ user, onSessionExpired, initialOpen = n
   const [ordersVersion, setOrdersVersion] = useState(0);
   const [pendingStatus, setPendingStatus] = useState(null);
   const [notice, setNotice] = useState('');
+  const [availabilityError, setAvailabilityError] = useState('');
   const statusBusy = useRef(false);
   const mounted = useRef(false);
   const isOperator = user?.role === 'PLATFORM_OPERATOR';
@@ -45,7 +46,42 @@ export default function RestaurantList({ user, onSessionExpired, initialOpen = n
     return () => { active = false; };
   }, [pendingOpen]);
 
+  const menuRestaurantId = selectedView === 'menu' ? selectedRestaurant?.id : null;
+  useEffect(() => {
+    if (user?.role !== 'CUSTOMER' || !menuRestaurantId) return undefined;
+    let active = true;
+    let inFlight = false;
+    let failed = false;
+    const refreshAvailability = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const items = await api.restaurants();
+        if (!active) return;
+        const current = items.find((item) => item.id === menuRestaurantId);
+        if (!current) throw new Error('This restaurant is no longer available.');
+        setRestaurants(items);
+        setSelectedRestaurant(current);
+        setAvailabilityError('');
+        failed = false;
+      } catch (loadError) {
+        if (!active) return;
+        setAvailabilityError(loadError.message);
+        if (!failed) record({ action: 'Refresh restaurant availability', outcome: 'error',
+          restaurantId: menuRestaurantId, message: loadError.message, httpStatus: loadError.status });
+        failed = true;
+        if (loadError.status === 401) onSessionExpired?.(loadError.message);
+      } finally {
+        inFlight = false;
+      }
+    };
+    refreshAvailability();
+    const timer = window.setInterval(refreshAvailability, 5000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [user?.role, menuRestaurantId, record, onSessionExpired]);
+
   const openRestaurant = (restaurant, view = 'menu') => {
+    setAvailabilityError('');
     setSelectedView(view);
     setSelectedRestaurant(restaurant);
   };
@@ -92,6 +128,7 @@ export default function RestaurantList({ user, onSessionExpired, initialOpen = n
             key={selectedRestaurant.id}
             restaurant={selectedRestaurant}
             user={user}
+            availabilityError={availabilityError}
             onBack={() => setSelectedRestaurant(null)}
             onOrderPlaced={() => setOrdersVersion((version) => version + 1)}
           />

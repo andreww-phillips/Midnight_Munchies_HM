@@ -9,7 +9,7 @@ import { CommandLogProvider } from './output_console/command_log_provider';
 import OutputConsole from './output_console/output_console';
 
 vi.mock('../../api', () => ({ api: {
-  orderHistory: vi.fn(), refundOrder: vi.fn(), orderSummary: vi.fn(), orderEvents: vi.fn(), restaurants: vi.fn()
+  orderHistory: vi.fn(), refundOrder: vi.fn(), cancelOrder: vi.fn(), orderSummary: vi.fn(), orderEvents: vi.fn(), restaurants: vi.fn()
 } }));
 
 const customer = { id: 'customer-1', role: 'CUSTOMER' };
@@ -293,4 +293,103 @@ it('ignores a late refund response after changing accounts', async () => {
   await act(async () => pending.resolve(refundResult));
   expect(container.textContent).toContain('No orders yet.');
   expect(container.textContent).not.toContain('refunded $30.19');
+});
+
+const placedOrder = { ...order, status: 'PLACED', billing: null,
+  timestamps: { PLACED: order.createdAt } };
+async function renderCancellationHistory(user = customer, props = {}) {
+  await act(async () => root.render(<CommandLogProvider>
+    <OrderHistory user={user} {...props} /><OutputConsole />
+  </CommandLogProvider>));
+}
+
+it('cancels the customer\'s placed order, refreshes history and records the result', async () => {
+  api.orderHistory.mockResolvedValue([placedOrder]);
+  api.cancelOrder.mockResolvedValue({ id: placedOrder.orderId, status: 'CANCELLED' });
+  await renderCancellationHistory();
+  api.orderHistory.mockResolvedValue([{ ...placedOrder, status: 'CANCELLED' }]);
+  await click('Cancel order');
+  expect(api.cancelOrder).toHaveBeenCalledExactlyOnceWith(placedOrder.orderId);
+  expect(container.querySelector('.order-card h4').textContent).toContain('CANCELLED');
+  expect(container.querySelector('.history-cancel-button')).toBeNull();
+  expect(container.querySelector('[role="log"]').textContent).toContain('Success · Cancel order');
+});
+
+it.each(['ACCEPTED', 'PREPARING', 'READY', 'PICKED_UP', 'DELIVERED', 'REFUNDED', 'REJECTED', 'CANCELLED'])
+  ('does not offer customer cancellation in state %s', async (status) => {
+    api.orderHistory.mockResolvedValue([{ ...placedOrder, status }]);
+    await render();
+    expect(container.querySelector('.history-cancel-button')).toBeNull();
+  });
+
+it.each(['PLATFORM_OPERATOR', 'RESTAURANT_STAFF', 'COURIER'])('does not expose the customer cancellation control to %s', async (role) => {
+  api.orderHistory.mockResolvedValue([placedOrder]);
+  await render({ ...customer, role });
+  expect(container.querySelector('.history-cancel-button')).toBeNull();
+});
+
+it('does not offer cancellation for another customer\'s order', async () => {
+  api.orderHistory.mockResolvedValue([{ ...placedOrder, customerId: 'other-customer' }]);
+  await render();
+  expect(container.querySelector('.history-cancel-button')).toBeNull();
+});
+
+it('blocks duplicate cancellation requests while the command is pending', async () => {
+  const pending = deferred();
+  api.orderHistory.mockResolvedValue([placedOrder]);
+  api.cancelOrder.mockReturnValue(pending.promise);
+  await renderCancellationHistory();
+  const button = container.querySelector('.history-cancel-button');
+  await act(async () => { button.click(); button.click(); });
+  expect(api.cancelOrder).toHaveBeenCalledTimes(1);
+  expect(button.disabled).toBe(true);
+  expect(button.textContent).toBe('Cancelling...');
+  api.orderHistory.mockResolvedValue([{ ...placedOrder, status: 'CANCELLED' }]);
+  await act(async () => pending.resolve({ id: placedOrder.orderId, status: 'CANCELLED' }));
+});
+
+it('reconciles a cancellation rejected because staff already accepted the order', async () => {
+  api.orderHistory.mockResolvedValue([placedOrder]);
+  api.cancelOrder.mockRejectedValue(Object.assign(new Error('Order is no longer placed'), { status: 409 }));
+  await renderCancellationHistory();
+  api.orderHistory.mockResolvedValue([{ ...placedOrder, status: 'ACCEPTED' }]);
+  await click('Cancel order');
+  expect(container.querySelector('.history-cancel-button')).toBeNull();
+  expect(container.querySelector('.order-card h4').textContent).toContain('ACCEPTED');
+  expect(container.querySelector('[role="alert"]').textContent).toBe('Order is no longer placed');
+  expect(container.querySelector('[role="log"]').textContent).not.toContain('Success · Cancel order');
+});
+
+it('preserves cancellation success when the following history refresh fails', async () => {
+  api.orderHistory.mockResolvedValue([placedOrder]);
+  api.cancelOrder.mockResolvedValue({ id: placedOrder.orderId, status: 'CANCELLED' });
+  await renderCancellationHistory();
+  api.orderHistory.mockRejectedValue(new Error('History unavailable'));
+  await click('Cancel order');
+  expect(container.textContent).toContain('Order #aaaaaaaa cancelled.');
+  expect(container.querySelector('[role="log"]').textContent).toContain('Success · Cancel order');
+  expect(container.querySelector('[role="alert"]').textContent).toBe('History unavailable');
+});
+
+it('clears order data when cancellation reports an expired session', async () => {
+  const onSessionExpired = vi.fn();
+  api.orderHistory.mockResolvedValue([placedOrder]);
+  api.cancelOrder.mockRejectedValue(Object.assign(new Error('Session expired'), { status: 401 }));
+  await renderCancellationHistory(customer, { onSessionExpired });
+  await click('Cancel order');
+  expect(onSessionExpired).toHaveBeenCalledOnce();
+  expect(container.querySelector('.order-card')).toBeNull();
+});
+
+it('ignores a late cancellation response after changing accounts', async () => {
+  const pending = deferred();
+  api.orderHistory.mockResolvedValue([placedOrder]);
+  api.cancelOrder.mockReturnValue(pending.promise);
+  await renderCancellationHistory();
+  await click('Cancel order');
+  api.orderHistory.mockResolvedValue([]);
+  await renderCancellationHistory({ id: 'new-customer', role: 'CUSTOMER' });
+  await act(async () => pending.resolve({ id: placedOrder.orderId, status: 'CANCELLED' }));
+  expect(container.textContent).toContain('No orders yet.');
+  expect(container.querySelector('[role="log"]').textContent).not.toContain('Success · Cancel order');
 });

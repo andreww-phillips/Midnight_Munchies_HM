@@ -4,14 +4,21 @@ import { formatPrice } from './menu_page/menu_format';
 import { useCommandLog } from './output_console/command_log';
 import './courier_dashboard_page.css';
 
-function DeliveryCard({ assignment, onAction, busy }) {
+function availableActions(dashboard) {
+  const status = dashboard?.assignment?.assignment.status;
+  const orderStatus = dashboard?.assignment?.order.status;
+  return {
+    duty: Boolean(dashboard) && (dashboard.onDuty ? dashboard.state === 'IDLE' : dashboard.state === 'OFFLINE'),
+    accept: dashboard?.onDuty && dashboard.state === 'IDLE' && status === 'OFFERED' && orderStatus === 'READY',
+    decline: dashboard?.onDuty && dashboard.state === 'IDLE' && status === 'OFFERED',
+    pickup: dashboard?.onDuty && dashboard.state === 'ASSIGNED' && status === 'ACCEPTED' && orderStatus === 'READY',
+    deliver: dashboard?.onDuty && dashboard.state === 'CARRYING' && status === 'PICKED_UP' && orderStatus === 'PICKED_UP'
+  };
+}
+
+function DeliveryCard({ assignment, onAction, busy, allowed }) {
   const { order } = assignment;
   const status = assignment.assignment.status;
-  const action = {
-    OFFERED: ['Accept offer', 'accept', 'Decline offer', 'decline'],
-    ACCEPTED: ['Confirm pickup', 'pickup'],
-    PICKED_UP: ['Confirm delivery', 'deliver'],
-  }[status];
 
   return (
     <article className="courier-delivery-card">
@@ -27,20 +34,18 @@ function DeliveryCard({ assignment, onAction, busy }) {
           </li>
         ))}
       </ul>
-      {action && (
-        <div className="courier-delivery-actions">
-          <button className="primary-button" type="button" disabled={busy}
-            onClick={() => onAction(action[1], order.id)}>
-            {action[0]}
-          </button>
-          {action?.[2] && (
-        <button className="secondary-button" type="button" disabled={busy}
-          onClick={() => onAction(action[3], order.id)}>
-          {action[2]}
-        </button>
-      )}
-        </div>
-      )}
+      <div className="courier-delivery-actions">
+        {status === 'OFFERED' && <>
+          <button className="primary-button" type="button" disabled={busy || !allowed.accept}
+            onClick={() => onAction('accept', order.id)}>Accept offer</button>
+          <button className="secondary-button" type="button" disabled={busy || !allowed.decline}
+            onClick={() => onAction('decline', order.id)}>Decline offer</button>
+        </>}
+        <button className="primary-button" type="button" disabled={busy || !allowed.pickup}
+          onClick={() => onAction('pickup', order.id)}>Confirm pickup</button>
+        <button className="primary-button" type="button" disabled={busy || !allowed.deliver}
+          onClick={() => onAction('deliver', order.id)}>Confirm delivery</button>
+      </div>
     </article>
   );
 }
@@ -51,21 +56,26 @@ export default function CourierDashboard({ onSessionExpired }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [unavailable, setUnavailable] = useState(false);
   const requestBusy = useRef(false);
+  const actionBusy = useRef(false);
   const mounted = useRef(false);
 
-  const refresh = useCallback(async () => {
-    if (requestBusy.current) return;
+  const refresh = useCallback(async (afterCommand = false) => {
+    if (requestBusy.current || (actionBusy.current && !afterCommand)) return;
     requestBusy.current = true;
+    setLoading(true);
     try {
       const current = await api.courierDashboard();
       if (mounted.current) {
         setDashboard(current);
         setError('');
+        setUnavailable(false);
       }
     } catch (loadError) {
       if (mounted.current) {
         setError(loadError.message);
+        setUnavailable(true);
         if (loadError.status === 401) onSessionExpired?.('Your session expired. Please log in again.');
       }
     } finally {
@@ -84,8 +94,13 @@ export default function CourierDashboard({ onSessionExpired }) {
     };
   }, [refresh]);
 
+  const allowed = availableActions(dashboard);
+  const controlsBusy = busy || loading || unavailable;
+
   const runAction = async (action, orderId) => {
-    if (busy) return;
+    if (controlsBusy || actionBusy.current || requestBusy.current || !allowed[action]) return;
+    if (action !== 'duty' && dashboard.assignment?.order.id !== orderId) return;
+    actionBusy.current = true;
     setBusy(true);
     setError('');
     const actions = {
@@ -104,13 +119,18 @@ export default function CourierDashboard({ onSessionExpired }) {
     };
     try {
       await actions[action]();
+      if (!mounted.current) return;
       record({ action: labels[action], outcome: 'success', orderId, message: 'Delivery status updated.' });
-      await refresh();
+      await refresh(true);
     } catch (commandError) {
-      setError(commandError.message);
       record({ action: labels[action], outcome: 'error', orderId, httpStatus: commandError.status, message: commandError.message });
+      if (!mounted.current) return;
+      if ([404, 409].includes(commandError.status)) await refresh(true);
+      if (!mounted.current) return;
+      setError(commandError.message);
       if (commandError.status === 401) onSessionExpired?.('Your session expired. Please log in again.');
     } finally {
+      actionBusy.current = false;
       if (mounted.current) setBusy(false);
     }
   };
@@ -123,7 +143,7 @@ export default function CourierDashboard({ onSessionExpired }) {
           <p className="muted">Offers are available only while you are on duty and idle.</p>
         </div>
         <button className={dashboard?.onDuty ? 'secondary-button' : 'primary-button'} type="button"
-          disabled={!dashboard || busy} onClick={() => runAction('duty')}>
+          disabled={controlsBusy || !allowed.duty} onClick={() => runAction('duty')}>
           {dashboard?.onDuty ? 'Go off duty' : 'Go on duty'}
         </button>
       </div>
@@ -135,14 +155,14 @@ export default function CourierDashboard({ onSessionExpired }) {
             Status: <strong>{dashboard.state.replaceAll('_', ' ')}</strong>
           </p>
           {dashboard.assignment ? (
-            <DeliveryCard assignment={dashboard.assignment} onAction={runAction} busy={busy} />
+            <DeliveryCard assignment={dashboard.assignment} onAction={runAction} busy={controlsBusy} allowed={allowed} />
           ) : (
             <section className="courier-empty-state">
               <h3>No active delivery</h3>
               <p>{dashboard.onDuty ? 'You are waiting for an offer.' : 'Go on duty to receive delivery offers.'}</p>
             </section>
           )}
-          <button className="secondary-button" type="button" disabled={busy} onClick={refresh}>
+          <button className="secondary-button" type="button" disabled={busy || loading} onClick={() => refresh()}>
             Refresh status
           </button>
         </>
