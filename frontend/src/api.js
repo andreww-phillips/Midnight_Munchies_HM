@@ -41,6 +41,10 @@ export const api = {
   }),
   logout: () => request("/api/auth/logout", { method: "POST" }),
   restaurants: () => request("/api/ord/restaurants"),
+  changeRestaurantStatus: (restaurantId, status) => request(`/api/ord/restaurants/${restaurantId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status })
+  }),
   menu: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/menu`),
   addMenuItem: (restaurantId, name, price) => request(`/api/ord/restaurants/${restaurantId}/menu`, {
     method: "POST",

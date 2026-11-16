@@ -1,20 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../../../api';
 import { storageUrl } from '../storage';
 import RestaurantMenu from '../menu_page/menu_page.jsx';
 import OrderHistory from '../order_history.jsx';
 import RestaurantDashboard from '../restaurant_dashboard/restaurant_dashboard.jsx';
+import { useCommandLog } from '../output_console/command_log';
 import './restaurant_library.css';
 
 export default function RestaurantList({ user, onSessionExpired, initialOpen = null }) {
+  const { record } = useCommandLog();
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   const [selectedView, setSelectedView] = useState('menu');
   const [ordersVersion, setOrdersVersion] = useState(0);
+  const [pendingStatus, setPendingStatus] = useState(null);
+  const [notice, setNotice] = useState('');
+  const statusBusy = useRef(false);
+  const mounted = useRef(false);
+  const isOperator = user?.role === 'PLATFORM_OPERATOR';
 
   const [pendingOpen] = useState(initialOpen);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -36,6 +48,33 @@ export default function RestaurantList({ user, onSessionExpired, initialOpen = n
   const openRestaurant = (restaurant, view = 'menu') => {
     setSelectedView(view);
     setSelectedRestaurant(restaurant);
+  };
+
+  const changeStatus = async (restaurant, status) => {
+    const ownsRestaurant = user?.role === 'RESTAURANT_STAFF' && Boolean(user.id) && restaurant.ownerId === user.id;
+    if (statusBusy.current || (!isOperator && !(ownsRestaurant && status === 'PAUSED'))) return;
+    statusBusy.current = true;
+    setPendingStatus(restaurant.id);
+    setError('');
+    setNotice('');
+    const action = status === 'PAUSED' ? 'Pause restaurant' : 'Reopen restaurant';
+    try {
+      const updated = await api.changeRestaurantStatus(restaurant.id, status);
+      const message = `${updated.name} is now ${updated.status}.`;
+      record({ action, outcome: 'success', restaurantId: updated.id, status: updated.status, message });
+      if (!mounted.current) return;
+      setRestaurants((items) => items.map((item) => item.id === updated.id ? updated : item));
+      setSelectedRestaurant((current) => current?.id === updated.id ? updated : current);
+      setNotice(message);
+    } catch (commandError) {
+      record({ action, outcome: 'error', restaurantId: restaurant.id, message: commandError.message, httpStatus: commandError.status });
+      if (!mounted.current) return;
+      setError(commandError.message);
+      if (commandError.status === 401) onSessionExpired?.(commandError.message);
+    } finally {
+      statusBusy.current = false;
+      if (mounted.current) setPendingStatus(null);
+    }
   };
 
   return (
@@ -61,6 +100,7 @@ export default function RestaurantList({ user, onSessionExpired, initialOpen = n
             <div className="section-heading"><h2>Restaurants</h2></div>
             {loading && <p role="status">Loading...</p>}
             {error && <p role="alert">{error}</p>}
+            {notice && <p role="status">{notice}</p>}
             {!loading && !error && restaurants.length === 0 && <p>No restaurants yet.</p>}
             <section id="restaurant-list">
               {[...restaurants].sort((a, b) => a.name.localeCompare(b.name)).map((restaurant) => {
@@ -70,11 +110,20 @@ export default function RestaurantList({ user, onSessionExpired, initialOpen = n
                   <div className="restaurant-card" key={restaurant.id}>
                     {logo && <img src={logo} alt={`${restaurant.name} logo`} width={120} height={120} />}
                     <h4>{restaurant.name}</h4>
+                    <p className="status-pill">Status: {restaurant.status}</p>
                     <button className="primary-button" type="button" onClick={() => openRestaurant(restaurant)}>Menu</button>
                     {canManage && <>
                       <button className="secondary-button" type="button" onClick={() => openRestaurant(restaurant)}>Edit menu</button>
                       <button className="secondary-button" type="button" onClick={() => openRestaurant(restaurant, 'orders')}>Manage orders</button>
                     </>}
+                    {(canManage || isOperator) && restaurant.status === 'OPEN' && (
+                      <button className="secondary-button" type="button" disabled={pendingStatus !== null}
+                        aria-label={`Pause ${restaurant.name}`} onClick={() => changeStatus(restaurant, 'PAUSED')}>Pause</button>
+                    )}
+                    {isOperator && ['PAUSED', 'CLOSED'].includes(restaurant.status) && (
+                      <button className="secondary-button" type="button" disabled={pendingStatus !== null}
+                        aria-label={`Reopen ${restaurant.name}`} onClick={() => changeStatus(restaurant, 'OPEN')}>Reopen</button>
+                    )}
                   </div>
                 );
               })}
