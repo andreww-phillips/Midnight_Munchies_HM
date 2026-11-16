@@ -3,9 +3,7 @@ package com.midnightmunchies.application.ord;
 import com.jayway.jsonpath.JsonPath;
 import com.midnightmunchies.application.dlv.CourierService;
 import com.midnightmunchies.application.dlv.DispatchQueueService;
-import com.midnightmunchies.application.prc.OrderLedgerService;
 import com.midnightmunchies.application.reg.AuthService;
-import com.midnightmunchies.application.reg.SessionService;
 import com.midnightmunchies.domain.dlv.CourierState;
 import com.midnightmunchies.domain.dlv.Location;
 import com.midnightmunchies.domain.ord.*;
@@ -31,7 +29,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** Invokes module operations directly; the authorized, coordinated endpoint belongs to the next step. */
+/** Exercises the coordinated HTTP reset across all modules and then reuses the running application. */
 @SpringBootTest(properties = {"logging.level.org.springframework=ERROR", "logging.level.root=ERROR"})
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -39,10 +37,7 @@ class ModuleResetIntegrationTests {
     private static final UUID DINER = UUID.fromString("10000000-0000-0000-0000-000000000001");
     private static final UUID MEAL = UUID.fromString("20000000-0000-0000-0000-000000000001");
     @Autowired private MockMvc mvc;
-    @Autowired private OrdResetService ordReset;
     @Autowired private CourierService delivery;
-    @Autowired private OrderLedgerService pricing;
-    @Autowired private SessionService sessions;
     @Autowired private AuthService auth;
     @Autowired private RestaurantRepository restaurants;
     @Autowired private MenuItemRepository menuItems;
@@ -54,7 +49,7 @@ class ModuleResetIntegrationTests {
     @Autowired private DispatchQueueService dispatch;
 
     @BeforeEach
-    void startFromSeed() {
+    void startFromSeed() throws Exception {
         resetModules();
     }
 
@@ -143,11 +138,9 @@ class ModuleResetIntegrationTests {
         assertEquals(courierAccount, auth.authenticate("courier@example.com", "password"));
     }
 
-    private void resetModules() {
-        delivery.resetToInitialState();
-        ordReset.resetToInitialState();
-        pricing.resetToInitialState();
-        sessions.resetToInitialState();
+    private void resetModules() throws Exception {
+        mvc.perform(post("/api/dash/reset").session(login("operator")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("RESET"));
     }
 
     private void assertInitialState() {
