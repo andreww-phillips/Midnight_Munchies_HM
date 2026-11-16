@@ -20,7 +20,7 @@ vi.mock('../../../api', () => ({ api: {
 } }));
 
 const staff = { id: 'staff-1', role: 'RESTAURANT_STAFF', username: 'staff@example.com' };
-const restaurant = { id: 'restaurant-1', ownerId: staff.id, name: 'Diner' };
+const restaurant = { id: 'restaurant-1', ownerId: staff.id, name: 'Diner', status: 'OPEN' };
 const item = { id: 'item-1', name: 'Fries', price: '5.49', status: 'AVAILABLE' };
 const order = (status = 'PLACED') => ({ id: 'order-1', restaurantId: restaurant.id, status,
   orderLines: [{ menuItemId: item.id, menuItemName: item.name, quantity: 1, unitPrice: item.price }] });

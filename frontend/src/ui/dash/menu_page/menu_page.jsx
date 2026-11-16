@@ -18,6 +18,7 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
   const [price, setPrice] = useState("");
   const canManage = user?.role === "RESTAURANT_STAFF" && Boolean(user.id) && restaurant.ownerId === user.id;
   const canOrder = user?.role === "CUSTOMER";
+  const restaurantOpen = restaurant.status === "OPEN";
   const busy = loading || pending !== null;
 
   const applyMenu = useCallback((items) => {
@@ -116,7 +117,7 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
   const total = cartLines.reduce((sum, line) => sum + Number(line.item.price) * line.quantity, 0);
 
   const placeOrder = async () => {
-    if (!canOrder || busy || commandBusy.current || !cartLines.length) return;
+    if (!canOrder || !restaurantOpen || busy || commandBusy.current || !cartLines.length) return;
     commandBusy.current = true;
     setError("");
     setPending("order");
@@ -164,6 +165,7 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
       {error && <p className="error-message" role="alert">{error}</p>}
       {loading && <p className="muted" role="status">Loading menu...</p>}
       {pending === "menu" && <p className="muted" role="status">Updating menu...</p>}
+      {canOrder && !restaurantOpen && <p className="muted">This restaurant is not open for orders.</p>}
       {user?.role === "RESTAURANT_STAFF" && !canManage && (
         <p className="muted">Only staff assigned to this restaurant can manage its menu.</p>
       )}
@@ -228,7 +230,7 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
         })}
       </div>
       {canOrder && (
-        <button className="primary-button order-button" type="button" disabled={busy || !cartLines.length} onClick={placeOrder}>
+        <button className="primary-button order-button" type="button" disabled={!restaurantOpen || busy || !cartLines.length} onClick={placeOrder}>
           {pending === "order" ? "Placing order..." : "Place order · " + formatPrice(total)}
         </button>
       )}
