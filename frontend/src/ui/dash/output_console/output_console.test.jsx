@@ -9,6 +9,8 @@ import OutputConsole from './output_console';
 import RegistrationPage from '../registration_page/registration_page';
 import RestaurantDashboard from '../restaurant_dashboard/restaurant_dashboard';
 import RestaurantMenu from '../menu_page/menu_page';
+import RestaurantList from '../restaurant_library/restaurant_library';
+import RestaurantDeliveries from '../map_page/restaurant_deliveries';
 import OrderEventHistory from '../order_event_history';
 
 vi.mock('../../../api', () => ({ api: {
@@ -16,7 +18,7 @@ vi.mock('../../../api', () => ({ api: {
   restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn(), preparationQueue: vi.fn(), menu: vi.fn(),
   acceptOrder: vi.fn(), rejectOrder: vi.fn(), startNextPreparation: vi.fn(), markOrderReady: vi.fn(),
   placeOrder: vi.fn(), addMenuItem: vi.fn(), editMenuItem: vi.fn(), removeMenuItem: vi.fn(),
-  changeMenuItemAvailability: vi.fn(), orderEvents: vi.fn()
+  changeMenuItemAvailability: vi.fn(), orderEvents: vi.fn(), operatorDeliveries: vi.fn(), reassignDelivery: vi.fn()
 } }));
 
 const staff = { id: 'staff-1', role: 'RESTAURANT_STAFF', username: 'staff@example.com' };
@@ -69,6 +71,68 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
+});
+
+describe('load error logging', () => {
+  it.each([401, 503])('records an initial menu HTTP %s failure once under StrictMode', async (status) => {
+    api.menu.mockRejectedValue(Object.assign(new Error('Menu unavailable'), { status }));
+    await renderLogged(<RestaurantMenu restaurant={restaurant} user={staff} />);
+    expect(entries()).toHaveLength(1);
+    expect(entries()[0].textContent).toContain('Error · Load menu');
+    expect(entries()[0].textContent).toContain(`HTTP ${status}`);
+    expect(container.querySelector('[role="alert"]').textContent).toBe('Menu unavailable');
+  });
+
+  it('records an initial restaurant catalog failure without a false success', async () => {
+    api.restaurants.mockRejectedValue(Object.assign(new Error('Catalog unavailable'), { status: 503 }));
+    await renderLogged(<RestaurantList user={staff} />);
+    expect(entries()).toHaveLength(1);
+    expect(entries()[0].textContent).toContain('Error · Load restaurants');
+    expect(entries()[0].textContent).toContain('HTTP 503');
+  });
+
+  it('records an initial restaurant order read failure', async () => {
+    api.orders.mockRejectedValue(Object.assign(new Error('Orders unavailable'), { status: 500 }));
+    await renderLogged(<RestaurantDashboard restaurant={restaurant} user={staff} />);
+    expect(entries()).toHaveLength(1);
+    expect(entries()[0].textContent).toContain('Error · Load restaurant orders');
+    expect(entries()[0].textContent).toContain('HTTP 500');
+  });
+
+  it.each([401, 503])('records an operator restaurant-delivery HTTP %s read failure', async (status) => {
+    const onSessionExpired = vi.fn();
+    api.operatorDeliveries.mockRejectedValue(Object.assign(new Error('Deliveries unavailable'), { status }));
+    await renderLogged(<RestaurantDeliveries orderIds={['order-1']} onSessionExpired={onSessionExpired} />);
+    expect(entries()).toHaveLength(1);
+    expect(entries()[0].textContent).toContain('Error · Load restaurant deliveries');
+    expect(entries()[0].textContent).toContain(`HTTP ${status}`);
+    expect(onSessionExpired).toHaveBeenCalledTimes(status === 401 ? 1 : 0);
+  });
+
+  it('keeps restaurant-details reassignment success separate from its delivery reload failure', async () => {
+    api.operatorDeliveries.mockResolvedValue({ active: [
+      { orderId: 'order-1', courierId: 'courier-1', status: 'OFFERED', reassignable: true }
+    ] });
+    api.reassignDelivery.mockResolvedValue({ queued: true });
+    await renderLogged(<RestaurantDeliveries orderIds={['order-1']} />);
+    api.operatorDeliveries.mockRejectedValue(Object.assign(new Error('Deliveries unavailable'), { status: 503 }));
+    await click(button('Reassign'));
+    expect(entries()).toHaveLength(2);
+    expect(entries()[0].textContent).toContain('Success · Reassign stalled order');
+    expect(entries()[1].textContent).toContain('Error · Load restaurant deliveries');
+    expect(api.reassignDelivery).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a late failure from a previously selected menu', async () => {
+    let reject;
+    api.menu.mockReturnValue(new Promise((_, fail) => { reject = fail; }));
+    await renderLogged(<RestaurantMenu restaurant={restaurant} user={staff} />);
+    api.menu.mockResolvedValue([]);
+    await renderLogged(<RestaurantMenu restaurant={{ ...restaurant, id: 'other-restaurant' }} user={staff} />);
+    await act(async () => reject(new Error('Old menu failure')));
+    expect(entries()).toHaveLength(0);
+    expect(container.textContent).not.toContain('Old menu failure');
+  });
 });
 afterEach(async () => {
   await act(async () => root.unmount());

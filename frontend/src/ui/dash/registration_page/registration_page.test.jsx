@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import RegistrationPage from './registration_page';
 import { api } from '../../../api';
+import * as commandLog from '../output_console/command_log';
 
 vi.mock('../../../api', () => ({ api: {
   currentUser: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(),
@@ -45,6 +46,21 @@ async function change(name, value) {
 async function submit() {
   await act(async () => container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
 }
+
+it.each([401, 503])('records unexpected session restoration errors but treats HTTP 401 as no saved session (HTTP %s)', async (status) => {
+  const changeIdentity = vi.fn();
+  const spy = vi.spyOn(commandLog, 'useCommandLog').mockReturnValue({ entries: [], record: vi.fn(), changeIdentity });
+  try {
+    api.currentUser.mockRejectedValue(Object.assign(new Error('Session check failed'), { status }));
+    await act(async () => root.render(<RegistrationPage />));
+    if (status === 401) expect(changeIdentity).not.toHaveBeenCalled();
+    else expect(changeIdentity).toHaveBeenCalledExactlyOnceWith(null, {
+      action: 'Restore session', outcome: 'error', message: 'Session check failed', httpStatus: 503
+    });
+  } finally {
+    spy.mockRestore();
+  }
+});
 async function registerAs(role) {
   await act(async () => root.render(<RegistrationPage />));
   expect(container.querySelector('[role="alert"]')).toBeNull();

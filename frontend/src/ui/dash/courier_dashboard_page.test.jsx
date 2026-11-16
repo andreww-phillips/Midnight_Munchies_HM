@@ -23,8 +23,8 @@ function snapshot(state = 'IDLE', assignmentStatus = 'OFFERED', orderStatus = 'R
 }
 let root, container;
 const button = (label) => [...container.querySelectorAll('button')].find((element) => element.textContent === label);
-async function render() {
-  await act(async () => root.render(<CommandLogProvider><CourierDashboard /><OutputConsole /></CommandLogProvider>));
+async function render(props = {}) {
+  await act(async () => root.render(<CommandLogProvider><CourierDashboard {...props} /><OutputConsole /></CommandLogProvider>));
 }
 async function click(label) {
   expect(button(label)).toBeDefined();
@@ -150,5 +150,70 @@ it('reconciles a rejected stale handoff without reporting success', async () => 
   await click('Confirm pickup');
   expect(button('Confirm pickup')).toBeUndefined();
   expect(container.querySelector('[role="alert"]').textContent).toBe('Assignment changed');
+  expect(container.querySelector('.console-entry--success')).toBeNull();
+});
+
+it('logs manual refresh success while successful background reads stay quiet', async () => {
+  await render();
+  await act(async () => vi.advanceTimersByTimeAsync(8000));
+  expect(container.querySelectorAll('.console-entry')).toHaveLength(0);
+  await click('Refresh status');
+  expect(container.querySelectorAll('.console-entry')).toHaveLength(1);
+  expect(container.querySelector('[role="log"]').textContent).toContain('Success · Refresh courier status');
+});
+
+it('records command success separately from a failed follow-up refresh', async () => {
+  await render();
+  api.courierDashboard.mockRejectedValue(Object.assign(new Error('Status unavailable'), { status: 503 }));
+  await click('Accept offer');
+  const entries = [...container.querySelectorAll('.console-entry')];
+  expect(entries).toHaveLength(2);
+  expect(entries[0].textContent).toContain('Success · Accept delivery offer');
+  expect(entries[1].textContent).toContain('Error · Refresh courier status');
+  expect(entries[1].textContent).toContain('HTTP 503');
+  expect(container.querySelector('[role="alert"]').textContent).toContain('delivery command succeeded');
+  expect(api.acceptDelivery).toHaveBeenCalledTimes(1);
+  expect(container.querySelector('[role="log"]').textContent).not.toContain('Error · Accept delivery offer');
+});
+
+it('coalesces identical background failures, logs different errors, and logs a new outage after recovery', async () => {
+  const failure = Object.assign(new Error('Server down'), { status: 503 });
+  api.courierDashboard.mockRejectedValue(failure);
+  await render();
+  await act(async () => vi.advanceTimersByTimeAsync(8000));
+  expect(container.querySelectorAll('.console-entry--error')).toHaveLength(1);
+  api.courierDashboard.mockRejectedValue(Object.assign(new Error('Connection lost'), { status: 500 }));
+  await act(async () => vi.advanceTimersByTimeAsync(4000));
+  expect(container.querySelectorAll('.console-entry--error')).toHaveLength(2);
+  api.courierDashboard.mockResolvedValue(snapshot());
+  await act(async () => vi.advanceTimersByTimeAsync(4000));
+  api.courierDashboard.mockRejectedValue(failure);
+  await act(async () => vi.advanceTimersByTimeAsync(4000));
+  expect(container.querySelectorAll('.console-entry--error')).toHaveLength(3);
+});
+
+it('logs every explicit failed refresh even during the same outage', async () => {
+  await render();
+  api.courierDashboard.mockRejectedValue(Object.assign(new Error('Server down'), { status: 503 }));
+  await click('Refresh status');
+  await click('Refresh status');
+  expect(container.querySelectorAll('.console-entry--error')).toHaveLength(2);
+});
+
+it('logs session expiry after a successful command without losing the successful outcome', async () => {
+  const onSessionExpired = vi.fn();
+  await render({ onSessionExpired });
+  api.courierDashboard.mockRejectedValue(Object.assign(new Error('Authentication required'), { status: 401 }));
+  await click('Accept offer');
+  expect(onSessionExpired).toHaveBeenCalledWith(expect.stringContaining('delivery command succeeded'));
+  expect(container.querySelector('.console-entry--success').textContent).toContain('Accept delivery offer');
+  expect(container.querySelector('.console-entry--error').textContent).toContain('HTTP 401');
+});
+
+it.each([403, 409, 500])('records a rejected courier command with its HTTP %s and no command success', async (status) => {
+  api.acceptDelivery.mockRejectedValue(Object.assign(new Error('Offer unavailable'), { status }));
+  await render();
+  await click('Accept offer');
+  expect(container.querySelector('.console-entry--error').textContent).toContain(`HTTP ${status}`);
   expect(container.querySelector('.console-entry--success')).toBeNull();
 });

@@ -34,10 +34,15 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
     let active = true;
     api.menu(restaurant.id)
       .then((items) => { if (active) applyMenu(items); })
-      .catch((loadError) => { if (active) setError(loadError.message); })
+      .catch((loadError) => {
+        if (!active) return;
+        setError(loadError.message);
+        record({ action: 'Load menu', outcome: 'error', restaurantId: restaurant.id,
+          message: loadError.message, httpStatus: loadError.status });
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [restaurant.id, applyMenu]);
+  }, [restaurant.id, applyMenu, record]);
 
   useEffect(() => {
     if (!canOrder || loading || pending !== null) return undefined;

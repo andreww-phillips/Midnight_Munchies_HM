@@ -22,6 +22,7 @@ export default function RestaurantDeliveries({ orderIds, refreshKey, onSessionEx
       })
       .catch((loadError) => {
         if (!current) return;
+        record({ action: 'Load restaurant deliveries', outcome: 'error', message: loadError.message, httpStatus: loadError.status });
         if (loadError.status === 401) {
           onSessionExpired?.(loadError.message);
           return;
@@ -29,7 +30,7 @@ export default function RestaurantDeliveries({ orderIds, refreshKey, onSessionEx
         setError(loadError.message);
       });
     return () => { current = false; };
-  }, [idsKey, refreshKey, version, onSessionExpired]);
+  }, [idsKey, refreshKey, version, onSessionExpired, record]);
 
   const reassign = async (orderId) => {
     if (busyOrder) return;

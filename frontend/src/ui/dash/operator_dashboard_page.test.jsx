@@ -22,9 +22,9 @@ const pickedUp = {
 let container, root;
 const button = (row) => container.querySelectorAll('tbody tr')[row].querySelector('button');
 
-async function render() {
+async function render(props = {}) {
   await act(async () => root.render(
-    <CommandLogProvider><OperatorDashboard /><OutputConsole /></CommandLogProvider>
+    <CommandLogProvider><OperatorDashboard {...props} /><OutputConsole /></CommandLogProvider>
   ));
 }
 
@@ -40,6 +40,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -87,5 +88,76 @@ describe('OperatorDashboard', () => {
   it('formats waiting time', () => {
     expect(formatWaiting(0)).toBe('0m 00s');
     expect(formatWaiting(61)).toBe('1m 01s');
+  });
+
+  it('logs explicit refresh success without logging successful polls', async () => {
+    vi.useFakeTimers();
+    await render();
+    await act(async () => vi.advanceTimersByTimeAsync(8000));
+    expect(container.querySelectorAll('.console-entry')).toHaveLength(0);
+    await act(async () => container.querySelector('.section-heading button').click());
+    expect(container.querySelectorAll('.console-entry')).toHaveLength(1);
+    expect(container.querySelector('[role="log"]').textContent).toContain('Success · Refresh delivery management');
+  });
+
+  it('logs a successful reassignment and its failed refresh as separate outcomes', async () => {
+    await render();
+    api.reassignDelivery.mockResolvedValue({ queued: true });
+    api.operatorDeliveries.mockRejectedValue(Object.assign(new Error('Management unavailable'), { status: 503 }));
+    await act(async () => button(0).click());
+    const entries = [...container.querySelectorAll('.console-entry')];
+    expect(entries).toHaveLength(2);
+    expect(entries[0].textContent).toContain('Success · Reassign stalled order');
+    expect(entries[1].textContent).toContain('Error · Refresh delivery management');
+    expect(entries[1].textContent).toContain('HTTP 503');
+    expect(container.querySelector('[role="alert"]').textContent).toContain('Reassignment succeeded');
+    expect(api.reassignDelivery).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs initial and changed read failures while coalescing identical failed polls until recovery', async () => {
+    vi.useFakeTimers();
+    const failure = Object.assign(new Error('Server down'), { status: 503 });
+    api.operatorDeliveries.mockRejectedValue(failure);
+    await render();
+    await act(async () => vi.advanceTimersByTimeAsync(8000));
+    expect(container.querySelectorAll('.console-entry--error')).toHaveLength(1);
+    api.operatorDeliveries.mockRejectedValue(Object.assign(new Error('Access denied'), { status: 403 }));
+    await act(async () => vi.advanceTimersByTimeAsync(4000));
+    expect(container.querySelectorAll('.console-entry--error')).toHaveLength(2);
+    api.operatorDeliveries.mockResolvedValue({ active: [], queued: [] });
+    await act(async () => vi.advanceTimersByTimeAsync(4000));
+    api.operatorDeliveries.mockRejectedValue(failure);
+    await act(async () => vi.advanceTimersByTimeAsync(4000));
+    expect(container.querySelectorAll('.console-entry--error')).toHaveLength(3);
+  });
+
+  it('logs each failed manual refresh even while background polling is failing', async () => {
+    api.operatorDeliveries.mockRejectedValue(Object.assign(new Error('Server down'), { status: 503 }));
+    await render();
+    await act(async () => container.querySelector('.section-heading button').click());
+    await act(async () => container.querySelector('.section-heading button').click());
+    expect(container.querySelectorAll('.console-entry--error')).toHaveLength(3);
+  });
+
+  it('keeps successful reassignment in the log when its refresh reports session expiry', async () => {
+    const onSessionExpired = vi.fn();
+    await render({ onSessionExpired });
+    api.reassignDelivery.mockResolvedValue({ queued: true });
+    api.operatorDeliveries.mockRejectedValue(Object.assign(new Error('Authentication required'), { status: 401 }));
+    await act(async () => button(0).click());
+    expect(onSessionExpired).toHaveBeenCalledWith(expect.stringContaining('Reassignment succeeded'));
+    expect(container.querySelector('.console-entry--success').textContent).toContain('Reassign stalled order');
+    expect(container.querySelector('.console-entry--error').textContent).toContain('HTTP 401');
+  });
+
+  it('does not issue or log duplicate reassignments from rapid clicks', async () => {
+    let resolve;
+    api.reassignDelivery.mockReturnValue(new Promise((finish) => { resolve = finish; }));
+    await render();
+    const control = button(0);
+    await act(async () => { control.click(); control.click(); });
+    expect(api.reassignDelivery).toHaveBeenCalledTimes(1);
+    await act(async () => resolve({ queued: true }));
+    expect(container.querySelectorAll('.console-entry--success')).toHaveLength(1);
   });
 });

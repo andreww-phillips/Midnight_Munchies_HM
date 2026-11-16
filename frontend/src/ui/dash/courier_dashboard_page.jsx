@@ -59,10 +59,11 @@ export default function CourierDashboard({ onSessionExpired }) {
   const [unavailable, setUnavailable] = useState(false);
   const requestBusy = useRef(false);
   const actionBusy = useRef(false);
+  const readFailure = useRef(null);
   const mounted = useRef(false);
 
-  const refresh = useCallback(async (afterCommand = false) => {
-    if (requestBusy.current || (actionBusy.current && !afterCommand)) return;
+  const refresh = useCallback(async (source = 'background') => {
+    if (requestBusy.current || (actionBusy.current && !['after-success', 'reconcile'].includes(source))) return;
     requestBusy.current = true;
     setLoading(true);
     try {
@@ -71,18 +72,30 @@ export default function CourierDashboard({ onSessionExpired }) {
         setDashboard(current);
         setError('');
         setUnavailable(false);
+        readFailure.current = null;
+        if (source === 'manual') record({ action: 'Refresh courier status', outcome: 'success', message: 'Courier status refreshed.' });
       }
     } catch (loadError) {
       if (mounted.current) {
-        setError(loadError.message);
+        const message = source === 'after-success'
+          ? `The delivery command succeeded, but courier status could not refresh: ${loadError.message}`
+          : loadError.message;
+        setError(message);
         setUnavailable(true);
-        if (loadError.status === 401) onSessionExpired?.('Your session expired. Please log in again.');
+        const failure = `${loadError.status ?? ''}:${loadError.message}`;
+        if (source !== 'background' || readFailure.current !== failure) {
+          record({ action: 'Refresh courier status', outcome: 'error', message, httpStatus: loadError.status });
+        }
+        readFailure.current = failure;
+        if (loadError.status === 401) onSessionExpired?.(source === 'after-success'
+          ? 'The delivery command succeeded, but courier status could not refresh. Your session expired. Please log in again.'
+          : 'Your session expired. Please log in again.');
       }
     } finally {
       requestBusy.current = false;
       if (mounted.current) setLoading(false);
     }
-  }, [onSessionExpired]);
+  }, [onSessionExpired, record]);
 
   useEffect(() => {
     mounted.current = true;
@@ -121,11 +134,11 @@ export default function CourierDashboard({ onSessionExpired }) {
       await actions[action]();
       if (!mounted.current) return;
       record({ action: labels[action], outcome: 'success', orderId, message: 'Delivery status updated.' });
-      await refresh(true);
+      await refresh('after-success');
     } catch (commandError) {
       record({ action: labels[action], outcome: 'error', orderId, httpStatus: commandError.status, message: commandError.message });
       if (!mounted.current) return;
-      if ([404, 409].includes(commandError.status)) await refresh(true);
+      if ([404, 409].includes(commandError.status)) await refresh('reconcile');
       if (!mounted.current) return;
       setError(commandError.message);
       if (commandError.status === 401) onSessionExpired?.('Your session expired. Please log in again.');
@@ -162,7 +175,7 @@ export default function CourierDashboard({ onSessionExpired }) {
               <p>{dashboard.onDuty ? 'You are waiting for an offer.' : 'Go on duty to receive delivery offers.'}</p>
             </section>
           )}
-          <button className="secondary-button" type="button" disabled={busy || loading} onClick={() => refresh()}>
+          <button className="secondary-button" type="button" disabled={busy || loading} onClick={() => refresh('manual')}>
             Refresh status
           </button>
         </>

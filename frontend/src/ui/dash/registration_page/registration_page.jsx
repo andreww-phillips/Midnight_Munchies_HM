@@ -51,7 +51,10 @@ function RegistrationScreen() {
       if (active && version === authVersion.current) { changeIdentity(`${account.id}:${account.role}`); setUser(account); }
     })
       .catch((sessionError) => {
-        if (active && version === authVersion.current && sessionError.status !== 401) setError(sessionError.message);
+        if (active && version === authVersion.current && sessionError.status !== 401) {
+          setError(sessionError.message);
+          changeIdentity(null, { action: 'Restore session', outcome: 'error', message: sessionError.message, httpStatus: sessionError.status });
+        }
       });
     return () => { active = false; };
   }, [changeIdentity]);

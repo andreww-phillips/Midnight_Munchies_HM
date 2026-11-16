@@ -41,10 +41,14 @@ export default function RestaurantList({ user, onSessionExpired, initialOpen = n
           setSelectedRestaurant(match);
         }
       })
-      .catch((loadError) => { if (active) setError(loadError.message); })
+      .catch((loadError) => {
+        if (!active) return;
+        setError(loadError.message);
+        record({ action: 'Load restaurants', outcome: 'error', message: loadError.message, httpStatus: loadError.status });
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [pendingOpen]);
+  }, [pendingOpen, record]);
 
   const menuRestaurantId = selectedView === 'menu' ? selectedRestaurant?.id : null;
   useEffect(() => {
