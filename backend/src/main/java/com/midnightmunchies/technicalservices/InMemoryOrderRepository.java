@@ -18,6 +18,10 @@ public class InMemoryOrderRepository implements OrderRepository {
 
 	private final Map<UUID, Order> orders = new ConcurrentHashMap<>();
 
+	public void clear() {
+		orders.clear();
+	}
+
 	@Override
 	public Optional<Order> findById(UUID id) {
 		return Optional.ofNullable(orders.get(Objects.requireNonNull(id, "id must not be null")));

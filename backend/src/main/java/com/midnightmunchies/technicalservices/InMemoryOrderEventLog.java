@@ -15,6 +15,10 @@ public class InMemoryOrderEventLog implements OrderEventLog {
 
 	private final Map<UUID, OrderEvent> events = new LinkedHashMap<>();
 
+	public synchronized void clear() {
+		events.clear();
+	}
+
 	@Override
 	public synchronized void append(OrderEvent event) {
 		Objects.requireNonNull(event, "event must not be null");

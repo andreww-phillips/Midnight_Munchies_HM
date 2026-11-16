@@ -15,6 +15,10 @@ public class InMemoryMenuItemRepository implements MenuItemRepository {
 
 	private final Map<UUID, MenuItem> menuItems = new ConcurrentHashMap<>();
 
+	public synchronized void clear() {
+		menuItems.clear();
+	}
+
 	@Override
 	public Optional<MenuItem> findById(UUID id) {
 		return Optional.ofNullable(menuItems.get(Objects.requireNonNull(id, "id must not be null")));

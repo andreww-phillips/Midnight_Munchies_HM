@@ -15,6 +15,10 @@ import com.midnightmunchies.domain.dlv.Assignment;
 public class AssignmentRepository {
     private final Map<UUID, Assignment> assignments = new ConcurrentHashMap<>();
 
+    public void clear() {
+        assignments.clear();
+    }
+
     public Assignment save(Assignment assignment) {
         assignments.put(assignment.id(), assignment);
         return assignment;

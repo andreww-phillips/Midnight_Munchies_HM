@@ -19,9 +19,11 @@ public class AuthController {
     private static final String SESSION_USER = "authenticatedUser";
 
     private final AuthService authService;
+    private final SessionService sessions;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, SessionService sessions) {
         this.authService = authService;
+        this.sessions = sessions;
     }
 
     @PostMapping("/login")
@@ -32,6 +34,7 @@ public class AuthController {
                     .body(new UserResponse(null, null, null, "Username or password is incorrect"));
         }
         session.setAttribute(SESSION_USER, account);
+        sessions.track(session);
         return ResponseEntity.ok(UserResponse.from(account));
     }
 
@@ -41,6 +44,7 @@ public class AuthController {
             UserAccount account = authService.register(request.username(), request.password(), request.role(),
                     request.restaurantName(), request.restaurantLogo(), request.menu());
             session.setAttribute(SESSION_USER, account);
+            sessions.track(session);
             return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(account));
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest()
@@ -62,6 +66,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpSession session) {
+        sessions.forget(session);
         session.invalidate();
         return ResponseEntity.noContent().build();
     }

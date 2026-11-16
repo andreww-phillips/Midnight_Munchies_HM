@@ -29,6 +29,11 @@ public class OrderLedgerService implements OrderEventListener {
         this.ledger = Objects.requireNonNull(ledger, "ledger must not be null");
     }
 
+    /** Internal reset operation; callers must exclude commands in the other modules. */
+    public synchronized void resetToInitialState() {
+        ledger.clear();
+    }
+
     /** Records placement separately because it is not a state-transition event. */
     public synchronized LedgerEntry recordCreated(Order order) {
         Objects.requireNonNull(order, "order must not be null");

@@ -15,6 +15,10 @@ public class InMemoryRestaurantRepository implements RestaurantRepository {
 
 	private final Map<UUID, Restaurant> restaurants = new ConcurrentHashMap<>();
 
+	public synchronized void clear() {
+		restaurants.clear();
+	}
+
 	@Override
 	public Optional<Restaurant> findById(UUID id) {
 		return Optional.ofNullable(restaurants.get(Objects.requireNonNull(id, "id must not be null")));

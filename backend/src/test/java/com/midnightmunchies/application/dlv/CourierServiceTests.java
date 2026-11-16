@@ -26,6 +26,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.UUID;
 
@@ -54,6 +55,21 @@ class CourierServiceTests {
         restaurants = new InMemoryRestaurantRepository();
         service = new CourierService(couriers, assignments, orders, restaurants, queue,
                 new OrderTransitions(orders, new OrderEventPublisher()));
+    }
+
+    @Test
+    void failedQueueResetKeepsCourierAndAssignmentState() throws Exception {
+        UserAccount courier = account(UserRole.COURIER);
+        Order ready = order(true);
+        service.setDuty(courier, true);
+        service.onEvent(event(ready, OrderStatus.PREPARING, OrderStatus.READY));
+        UUID assignmentId = service.view(courier).assignment().assignment().id();
+        Files.createDirectory(tempDir.resolve("dispatch-queue.txt.tmp"));
+
+        assertThrows(IllegalStateException.class, service::resetToInitialState);
+        assertTrue(couriers.findById(id(courier)).isPresent());
+        assertEquals(assignmentId, assignments.findActiveByOrderId(ready.getId()).orElseThrow().id());
+        assertEquals(List.of(ready.getId()), queue.view());
     }
 
     @Test

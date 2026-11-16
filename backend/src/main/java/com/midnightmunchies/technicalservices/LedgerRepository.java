@@ -20,6 +20,11 @@ public class LedgerRepository {
     private final Map<UUID, LedgerEntry> entries = new HashMap<>();
     private final Map<UUID, Refund> refundsByOrderId = new HashMap<>();
 
+    public synchronized void clear() {
+        entries.clear();
+        refundsByOrderId.clear();
+    }
+
     /**
      * Inserts or replaces one order's snapshot, returning the saved record.
      * Once a charge is recorded it cannot be changed or removed by a later save.

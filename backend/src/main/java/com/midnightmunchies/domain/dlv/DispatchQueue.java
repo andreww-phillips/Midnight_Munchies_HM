@@ -12,6 +12,11 @@ public final class DispatchQueue {
     private final ArrayDeque<UUID> orders = new ArrayDeque<>();
     private final LinkedHashSet<UUID> queued = new LinkedHashSet<>();
 
+    public synchronized void clear() {
+        orders.clear();
+        queued.clear();
+    }
+
     public synchronized void enqueue(UUID orderId) {
         Objects.requireNonNull(orderId, "orderId must not be null");
         if (queued.add(orderId)) {

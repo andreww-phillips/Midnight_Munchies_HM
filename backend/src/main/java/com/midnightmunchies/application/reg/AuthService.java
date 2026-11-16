@@ -12,12 +12,15 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Service
 public class AuthService {
     private final Map<String, UserAccount> users = new ConcurrentHashMap<>();
+    private final Map<String, UserAccount> initialUsers;
     private final RestaurantRepository restaurants;
 
     public AuthService(RestaurantRepository restaurants) {
@@ -27,6 +30,13 @@ public class AuthService {
                 "restaurant@example.com", "password", UserRole.RESTAURANT_STAFF);
         seed("courier@example.com", "password", UserRole.COURIER);
         seed("operator@example.com", "password", UserRole.PLATFORM_OPERATOR);
+        initialUsers = Map.copyOf(users);
+    }
+
+    synchronized Set<String> restoreInitialAccounts() {
+        users.clear();
+        users.putAll(initialUsers);
+        return initialUsers.values().stream().map(UserAccount::id).collect(Collectors.toUnmodifiableSet());
     }
 
     public UserAccount authenticate(String username, String password) {
