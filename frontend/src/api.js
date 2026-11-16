@@ -106,5 +106,6 @@ export const api = {
     method: "POST"
   }),
   operatorDeliveries: () => request("/api/dlv/operator/deliveries"),
+  resetSimulator: () => request("/api/dash/reset", { method: "POST" }),
   cityMap: () => request("/api/dash/map")
 };

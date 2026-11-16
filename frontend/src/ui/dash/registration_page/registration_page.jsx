@@ -8,6 +8,7 @@ import { api } from "../../../api";
 import { useCommandLog } from "../output_console/command_log";
 import { CommandLogProvider } from "../output_console/command_log_provider";
 import OutputConsole from "../output_console/output_console";
+import ResetControl from "../reset_control";
 
 function readFile(file) {
   if (!file) return Promise.resolve(null);
@@ -23,12 +24,16 @@ function RegistrationScreen() {
   const { record, changeIdentity } = useCommandLog();
   const submitting = useRef(false);
   const authVersion = useRef(0);
+  const dashboardEpoch = useRef(0);
   const [isLogin, setIsLogin] = useState(true);
   const [user, setUser] = useState(null);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [view, setView] = useState("restaurants");
   const [openRequest, setOpenRequest] = useState(null);
+  const [isResetting, setIsResetting] = useState(false);
+  const [dashboardVersion, setDashboardVersion] = useState(0);
+  const [resetNotice, setResetNotice] = useState("");
   const [formData, setFormData] = useState({
     role: "",
     username: "",
@@ -153,6 +158,7 @@ function RegistrationScreen() {
     setUser(null);
     setView("restaurants");
     setOpenRequest(null);
+    setResetNotice("");
     setError("");
     setFormData({
       role: "",
@@ -169,16 +175,64 @@ function RegistrationScreen() {
     });
   };
 
-  const handleSessionExpired = useCallback((message) => {
+  const handleSessionExpired = useCallback((message, entries) => {
     authVersion.current += 1;
-    changeIdentity(null, { action: 'Session expired', outcome: 'error', message: 'Your session expired. Please log in again.', httpStatus: 401 });
+    changeIdentity(null, entries ?? { action: 'Session expired', outcome: 'error', message: 'Your session expired. Please log in again.', httpStatus: 401 });
     setUser(null);
     setView("restaurants");
     setOpenRequest(null);
+    setResetNotice("");
     setIsLogin(true);
     setError(message);
     setFormData((previous) => ({ ...previous, password: "" }));
   }, [changeIdentity]);
+
+  const handleViewSessionExpired = useCallback((message) => {
+    if (dashboardEpoch.current === dashboardVersion) handleSessionExpired(message);
+  }, [dashboardVersion, handleSessionExpired]);
+
+  const handleReset = async () => {
+    if (user?.role !== 'PLATFORM_OPERATOR' || submitting.current) return;
+    submitting.current = true;
+    authVersion.current += 1;
+    setIsResetting(true);
+    // Remount the active view even when a fast response batches the pending render.
+    setDashboardVersion(++dashboardEpoch.current);
+    setOpenRequest(null);
+    setError("");
+    setResetNotice("");
+    try {
+      let result;
+      try {
+        result = await api.resetSimulator();
+      } catch (resetError) {
+        const entry = { action: 'Reset simulator', outcome: 'error', message: resetError.message, httpStatus: resetError.status };
+        if (resetError.status === 401) handleSessionExpired(resetError.message, entry);
+        else { setError(resetError.message); record(entry); }
+        return;
+      }
+
+      const restored = { action: 'Reset simulator', outcome: 'success', status: result.status, message: result.message };
+      // Reset removes runtime accounts and their sessions, including a runtime operator.
+      // Keep reset success distinct from a subsequent session/refresh failure.
+      try {
+        const account = await api.currentUser();
+        changeIdentity(`${account.id}:${account.role}`, restored);
+        setUser(account);
+        setResetNotice(result.message);
+      } catch (sessionError) {
+        const message = sessionError.status === 401
+          ? 'Reset succeeded. Your session ended. Please log in again.'
+          : `Reset succeeded, but your session could not be checked: ${sessionError.message}. Please log in again.`;
+        handleSessionExpired(message, [restored, {
+          action: 'Refresh session after reset', outcome: 'error', message: sessionError.message, httpStatus: sessionError.status
+        }]);
+      }
+    } finally {
+      submitting.current = false;
+      setIsResetting(false);
+    }
+  };
 
   if (user) {
     return (
@@ -189,36 +243,44 @@ function RegistrationScreen() {
             <h1>Welcome, {user.username}</h1>
             <p className="muted">Role: {user.role}</p>
           </div>
-          <button className="secondary-button" type="button" disabled={isSubmitting} onClick={handleLogout}>Log out</button>
+          <button className="secondary-button" type="button" disabled={isSubmitting || isResetting} onClick={handleLogout}>Log out</button>
         </header>
         {error && <p role="alert">{error}</p>}
+        {resetNotice && <p role="status">{resetNotice}</p>}
+        <ResetControl user={user} pending={isSubmitting || isResetting} onReset={handleReset} />
         <nav className="view-switcher" aria-label="Dashboard views">
-          <button type="button" aria-pressed={view === "restaurants"}
+          <button type="button" disabled={isResetting} aria-pressed={view === "restaurants"}
             className={view === "restaurants" ? "primary-button" : "secondary-button"}
             onClick={() => { setOpenRequest(null); setView("restaurants"); }}>
             {user.role === "COURIER" ? "Deliveries" : "Restaurants"}
           </button>
-          <button type="button" aria-pressed={view === "map"}
+          <button type="button" disabled={isResetting} aria-pressed={view === "map"}
             className={view === "map" ? "primary-button" : "secondary-button"}
             onClick={() => { setOpenRequest(null); setView("map"); }}>Map</button>
-          <button type="button" aria-pressed={view === "history"}
+          <button type="button" disabled={isResetting} aria-pressed={view === "history"}
             className={view === "history" ? "primary-button" : "secondary-button"}
             onClick={() => { setOpenRequest(null); setView("history"); }}>Pricing &amp; History</button>
         </nav>
-        {view === "history" ? (
-          <OrderHistory user={user} onSessionExpired={handleSessionExpired} />
-        ) : view === "map" ? (
-          <MapPage key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleSessionExpired}
-            onOpenRestaurant={(restaurant, mode) => { setOpenRequest({ restaurantId: restaurant.id, view: mode }); setView("restaurants"); }} />
+        {isResetting ? (
+          <p role="status">Resetting simulator...</p>
         ) : (
-          <>
-            {user.role === "PLATFORM_OPERATOR" && (
-              <OperatorDashboard key={`${user.id}:operator`} onSessionExpired={handleSessionExpired} />
+          <React.Fragment key={dashboardVersion}>
+            {view === "history" ? (
+              <OrderHistory user={user} onSessionExpired={handleViewSessionExpired} />
+            ) : view === "map" ? (
+              <MapPage key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleViewSessionExpired}
+                onOpenRestaurant={(restaurant, mode) => { setOpenRequest({ restaurantId: restaurant.id, view: mode }); setView("restaurants"); }} />
+            ) : (
+              <>
+                {user.role === "PLATFORM_OPERATOR" && (
+                  <OperatorDashboard key={`${user.id}:operator`} onSessionExpired={handleViewSessionExpired} />
+                )}
+                {user.role === "COURIER"
+                  ? <CourierDashboard key={`${user.id}:${user.role}`} onSessionExpired={handleViewSessionExpired} />
+                  : <RestaurantList key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleViewSessionExpired} initialOpen={openRequest} />}
+              </>
             )}
-            {user.role === "COURIER"
-              ? <CourierDashboard key={`${user.id}:${user.role}`} onSessionExpired={handleSessionExpired} />
-              : <RestaurantList key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleSessionExpired} initialOpen={openRequest} />}
-          </>
+          </React.Fragment>
         )}
         <OutputConsole />
       </div>
