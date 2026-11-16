@@ -93,6 +93,16 @@ npm run dev
 
 Open the URL printed by Vite, usually `http://localhost:5173`.
 
+### Resetting the simulation
+
+Log in as `operator@example.com` with password `password`, select **Reset
+simulator**, then **Confirm reset**. Reset restores the initial catalog and
+accounts and clears orders, preparation queues, deliveries, billing, refunds,
+and the persisted dispatch queue. Seeded accounts retain their identities and
+sessions; accounts created since startup are removed and their sessions revoked.
+The dashboard reloads its current view and clears old selections and console
+history, retaining the Reset result.
+
 ### Stopping the Application
 
 Press `Ctrl+C` in each terminal running the backend or frontend.
