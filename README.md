@@ -123,3 +123,25 @@ npm run build
 
 Backend tests use memory or an isolated local HTTP fixture; they never access
 the shared Supabase database. Frontend tests mock backend API calls.
+
+## Running with Docker
+
+Docker runs the backend and the frontend in containers, with no local Java or
+Node.js install. Install Docker Desktop, then run this from the repository root:
+
+```bash
+docker compose up --build
+```
+
+The frontend is served at `http://localhost:5173` and the backend API at
+`http://localhost:8080`. The backend only accepts browser requests from
+`http://localhost:5173`, so keep that port for the frontend.
+
+Stop the containers with `Ctrl+C`, or `docker compose down`. Accounts, orders and
+menus live in memory and reset when the backend container restarts. The FIFO
+dispatch queue file is kept in the `backend-data` volume;
+`docker compose down -v` deletes it too.
+
+Optional settings (Supabase mode, Google Maps keys) go in a `.env` file at the
+repository root. `.env.example` lists every variable. Frontend values are baked
+into the build, so rebuild after changing them with `docker compose up --build`.
