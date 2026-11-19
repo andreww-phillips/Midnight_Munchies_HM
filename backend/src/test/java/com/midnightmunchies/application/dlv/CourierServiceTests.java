@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.nio.file.Path;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Comparator;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -220,7 +221,7 @@ class CourierServiceTests {
         assertEquals(AssignmentStatus.OFFERED, row.status());
         assertTrue(row.reassignable());
         assertTrue(row.waitingSeconds() >= 0);
-        assertEquals(List.of(waiting.getId()), view.queued());
+        assertEquals(List.of(offered.getId(), waiting.getId()), view.queued());
         assertThrows(com.midnightmunchies.application.ord.AuthorizationException.class,
                 () -> service.operatorDeliveries(courier));
     }
@@ -286,8 +287,11 @@ class CourierServiceTests {
 
     @Test
     void keepsFifoOrdersQueuedWhileOfferedAndOnlyDequeuesEachOnAcceptance() {
-        UserAccount firstCourier = account(UserRole.COURIER);
-        UserAccount secondCourier = account(UserRole.COURIER);
+        // These orders have no catalog restaurant, so dispatch falls back to the lowest courier ID.
+        List<UserAccount> candidates = List.of(account(UserRole.COURIER), account(UserRole.COURIER)).stream()
+                .sorted(Comparator.comparing(UserAccount::id)).toList();
+        UserAccount firstCourier = candidates.get(0);
+        UserAccount secondCourier = candidates.get(1);
         service.setDuty(firstCourier, true);
         service.setDuty(secondCourier, true);
         Order first = order(true);

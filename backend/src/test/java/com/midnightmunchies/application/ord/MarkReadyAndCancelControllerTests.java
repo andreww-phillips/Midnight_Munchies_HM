@@ -71,7 +71,7 @@ class MarkReadyAndCancelControllerTests {
         customerId = UUID.fromString(customer.id());
         restaurantId = UUID.randomUUID();
         staff = new Actor(UUID.fromString(owner.id()), UserRole.RESTAURANT_STAFF);
-        restaurants.save(new Restaurant(restaurantId, UUID.fromString(owner.id()), "Diner", RestaurantStatus.OPEN, 0, 0));
+        restaurants.save(new Restaurant(restaurantId, UUID.fromString(owner.id()), "Diner " + restaurantId, RestaurantStatus.OPEN, 0, 0));
     }
 
     @Test

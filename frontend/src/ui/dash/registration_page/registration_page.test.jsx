@@ -115,7 +115,13 @@ it.each([
   expect(api.register).toHaveBeenCalledWith(account.username, 'password', serverRole,
     role === 'restaurant' ? { restaurantName: 'New Diner', restaurantLogo: null, menu: null } : {});
   expect(container.textContent).toContain(`Welcome, ${account.username}`);
-  expect(api.restaurants).toHaveBeenCalled();
+  if (serverRole === 'COURIER') {
+    expect(api.courierDashboard).toHaveBeenCalledWith();
+    expect(api.restaurants).not.toHaveBeenCalled();
+  } else {
+    expect(api.restaurants).toHaveBeenCalled();
+    expect(api.courierDashboard).not.toHaveBeenCalled();
+  }
 });
 
 it('allows retrying a failed backend registration', async () => {

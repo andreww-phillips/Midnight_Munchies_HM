@@ -56,6 +56,6 @@ class InMemoryRestaurantRepositoryTests {
 	}
 
 	private Restaurant restaurant(UUID id, RestaurantStatus status) {
-		return new Restaurant(id, "Diner", status, 45.5, -73.5);
+		return new Restaurant(id, "Diner " + id, status, 45.5, -73.5);
 	}
 }

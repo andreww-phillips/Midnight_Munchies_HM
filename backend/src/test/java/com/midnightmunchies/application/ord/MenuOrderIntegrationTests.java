@@ -55,7 +55,7 @@ class MenuOrderIntegrationTests {
         customerSession = login(customer.username());
         restaurantId = UUID.randomUUID();
         // Restaurant provisioning is fixture setup; menu changes and orders go through HTTP and the Proxy.
-        restaurants.save(new Restaurant(restaurantId, UUID.fromString(staff.id()), "Diner", RestaurantStatus.OPEN, 0, 0));
+        restaurants.save(new Restaurant(restaurantId, UUID.fromString(staff.id()), "Diner " + restaurantId, RestaurantStatus.OPEN, 0, 0));
     }
 
     @Test

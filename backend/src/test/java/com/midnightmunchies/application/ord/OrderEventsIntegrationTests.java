@@ -80,7 +80,7 @@ class OrderEventsIntegrationTests {
         staff = new Actor(UUID.fromString(owner.id()), UserRole.RESTAURANT_STAFF);
         customerId = UUID.fromString(customer.id());
         restaurantId = UUID.randomUUID();
-        restaurants.save(new Restaurant(restaurantId, staff.userId(), "Diner", RestaurantStatus.OPEN, 0, 0));
+        restaurants.save(new Restaurant(restaurantId, staff.userId(), "Diner " + restaurantId, RestaurantStatus.OPEN, 0, 0));
     }
 
     @Test

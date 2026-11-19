@@ -65,8 +65,8 @@ class OrdControllerTests {
         ownerSession = login(owner.username());
         restaurantId = UUID.randomUUID();
         otherRestaurantId = UUID.randomUUID();
-        restaurants.save(new Restaurant(restaurantId, ownerId, "Diner", RestaurantStatus.OPEN, 0, 0));
-        restaurants.save(new Restaurant(otherRestaurantId, UUID.randomUUID(), "Other Diner", RestaurantStatus.OPEN, 0, 0));
+        restaurants.save(new Restaurant(restaurantId, ownerId, "Diner " + restaurantId, RestaurantStatus.OPEN, 0, 0));
+        restaurants.save(new Restaurant(otherRestaurantId, UUID.randomUUID(), "Other Diner " + otherRestaurantId, RestaurantStatus.OPEN, 0, 0));
         original = menuItems.save(new MenuItem(UUID.randomUUID(), restaurantId, "Poutine",
                 new BigDecimal("12.35"), MenuItemStatus.AVAILABLE));
         otherItem = menuItems.save(new MenuItem(UUID.randomUUID(), otherRestaurantId, "Pizza",
@@ -170,7 +170,7 @@ class OrdControllerTests {
         UserAccount account = authService.register(UUID.randomUUID() + "@example.com", "password", role);
         MockHttpSession session = login(account.username());
         // Matching ownership alone must not grant a non-staff account access.
-        restaurants.save(new Restaurant(restaurantId, UUID.fromString(account.id()), "Diner", RestaurantStatus.OPEN, 0, 0));
+        restaurants.save(new Restaurant(restaurantId, UUID.fromString(account.id()), "Diner " + restaurantId, RestaurantStatus.OPEN, 0, 0));
 
         for (MenuOperation operation : MenuOperation.values()) {
             String body = operation == MenuOperation.STATUS
@@ -191,7 +191,7 @@ class OrdControllerTests {
     @ParameterizedTest
     @EnumSource(value = MenuOperation.class, names = {"EDIT", "REMOVE", "STATUS"})
     void itemsFromAnotherMenuReturnNotFoundEvenIfStaffOwnsBothRestaurants(MenuOperation operation) throws Exception {
-        restaurants.save(new Restaurant(otherRestaurantId, ownerId, "Other Diner", RestaurantStatus.OPEN, 0, 0));
+        restaurants.save(new Restaurant(otherRestaurantId, ownerId, "Other Diner " + otherRestaurantId, RestaurantStatus.OPEN, 0, 0));
 
         assertRejectedWithoutChanges(menuRequest(operation, restaurantId, otherItem.getId()).session(ownerSession), 404);
     }
