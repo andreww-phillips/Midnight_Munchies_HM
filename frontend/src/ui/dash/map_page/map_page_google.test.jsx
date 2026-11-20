@@ -18,8 +18,13 @@ vi.mock('@vis.gl/react-google-maps', () => ({
     google.mapProps = props;
     return <div className="mock-map">{props.children}</div>;
   },
-  AdvancedMarker: ({ children, title, onClick }) => (
-    <div className="mock-marker" title={title} onClick={onClick}>{children}</div>
+  AdvancedMarkerAnchorPoint: { CENTER: ['50%', '50%'], BOTTOM_CENTER: ['50%', '100%'] },
+  AdvancedMarker: ({ children, title, onClick, onMouseEnter, onMouseLeave, anchorPoint, zIndex, clickable, position }) => (
+    <div className="mock-marker" title={title} onClick={onClick} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}
+      data-anchor={JSON.stringify(anchorPoint)} data-z={zIndex} data-clickable={String(clickable ?? true)}
+      data-position={JSON.stringify(position)}>
+      {children}
+    </div>
   ),
   useApiLoadingStatus: () => google.status,
   useMap: () => google.map
@@ -98,18 +103,62 @@ describe('Google city map', () => {
     expect(google.fitBounds).toHaveBeenCalledTimes(1);
   });
 
-  it('locks the view so users cannot zoom or pan, and refits when the window resizes', async () => {
+  it('lets users zoom and pan within Montreal with only the zoom buttons shown', async () => {
     await render();
 
     expect(google.mapProps).toMatchObject({
-      gestureHandling: 'none', disableDefaultUI: true, keyboardShortcuts: false,
-      disableDoubleClickZoom: true, scrollwheel: false
+      gestureHandling: 'cooperative', disableDefaultUI: true, zoomControl: true, minZoom: 10, maxZoom: 18
     });
-    expect(google.fitBounds).toHaveBeenCalledTimes(1);
+    expect(google.mapProps.scrollwheel).toBeUndefined();
+    expect(google.mapProps.disableDoubleClickZoom).toBeUndefined();
+    const limits = google.mapProps.restriction.latLngBounds;
+    expect(limits.south).toBeLessThanOrEqual(45.40);
+    expect(limits.north).toBeGreaterThanOrEqual(45.71);
+    expect(limits.west).toBeLessThanOrEqual(-73.98);
+    expect(limits.east).toBeGreaterThanOrEqual(-73.47);
+    expect(google.mapProps.restriction.strictBounds).toBe(false);
+  });
+
+  it('keeps fitting to all markers on resize until the user pans the map', async () => {
+    await render();
+    await act(async () => google.mapProps.onIdle());
 
     await act(async () => window.dispatchEvent(new Event('resize')));
     expect(google.fitBounds).toHaveBeenCalledTimes(2);
     expect(google.fitBounds.mock.calls[1]).toEqual(google.fitBounds.mock.calls[0]);
+
+    await act(async () => google.mapProps.onIdle());
+    await act(async () => google.mapProps.onDragstart());
+    await act(async () => window.dispatchEvent(new Event('resize')));
+    expect(google.fitBounds).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('.gmap-fit').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('ignores zoom changes caused by its own fitting but stops after a user zoom', async () => {
+    await render();
+
+    await act(async () => google.mapProps.onZoomChanged());
+    await act(async () => window.dispatchEvent(new Event('resize')));
+    expect(google.fitBounds).toHaveBeenCalledTimes(2);
+
+    await act(async () => google.mapProps.onIdle());
+    await act(async () => google.mapProps.onZoomChanged());
+    await act(async () => window.dispatchEvent(new Event('resize')));
+    expect(google.fitBounds).toHaveBeenCalledTimes(2);
+  });
+
+  it('fits all markers again and resumes auto-fit from the Fit all button', async () => {
+    await render();
+    await act(async () => google.mapProps.onIdle());
+    await act(async () => google.mapProps.onDragstart());
+
+    await act(async () => container.querySelector('.gmap-fit').click());
+    expect(google.fitBounds).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('.gmap-fit').getAttribute('aria-pressed')).toBe('true');
+
+    await act(async () => google.mapProps.onIdle());
+    await act(async () => window.dispatchEvent(new Event('resize')));
+    expect(google.fitBounds).toHaveBeenCalledTimes(3);
   });
 
   it('stops refitting on resize after the map is closed', async () => {
@@ -118,6 +167,60 @@ describe('Google city map', () => {
 
     window.dispatchEvent(new Event('resize'));
     expect(google.fitBounds).toHaveBeenCalledTimes(1);
+  });
+
+  it('anchors every marker at its centre so the dot sits exactly on its coordinates', async () => {
+    await render();
+
+    const markers = [...container.querySelectorAll('.mock-marker')];
+    expect(markers).toHaveLength(3);
+    for (const marker of markers) {
+      expect(marker.dataset.anchor).toBe(JSON.stringify(['50%', '50%']));
+    }
+    const restaurantMarker = container.querySelector('.gmap-restaurant').parentElement;
+    expect(JSON.parse(restaurantMarker.dataset.position)).toEqual({ lat: 45.5048, lng: -73.5772 });
+  });
+
+  it('keeps restaurant markers in place when labels are toggled', async () => {
+    await render();
+    const before = [...container.querySelectorAll('.gmap-restaurant')]
+      .map((pin) => [pin.parentElement.dataset.position, pin.parentElement.dataset.anchor]);
+
+    await act(async () => container.querySelector('.map-toggle input').click());
+    const after = [...container.querySelectorAll('.gmap-restaurant')]
+      .map((pin) => [pin.parentElement.dataset.position, pin.parentElement.dataset.anchor]);
+
+    expect(container.querySelector('.gmap-label')).toBeNull();
+    expect(after).toEqual(before);
+  });
+
+  it('draws couriers above restaurants without blocking clicks on them', async () => {
+    await render();
+
+    const courier = container.querySelector('.gmap-courier').parentElement;
+    const restaurants = [...container.querySelectorAll('.gmap-restaurant')].map((pin) => pin.parentElement);
+    expect(courier.dataset.clickable).toBe('false');
+    for (const marker of restaurants) {
+      expect(Number(courier.dataset.z)).toBeGreaterThan(Number(marker.dataset.z));
+    }
+  });
+
+  it('brings a hovered or selected restaurant and its label to the front', async () => {
+    await render();
+    const [first, second] = [...container.querySelectorAll('.gmap-restaurant')].map((pin) => pin.parentElement);
+    const courierZ = Number(container.querySelector('.gmap-courier').parentElement.dataset.z);
+    expect(first.dataset.z).toBe(second.dataset.z);
+
+    await act(async () => second.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+    expect(Number(second.dataset.z)).toBeGreaterThan(courierZ);
+    expect(Number(second.dataset.z)).toBeGreaterThan(Number(first.dataset.z));
+
+    await act(async () => second.dispatchEvent(new MouseEvent('mouseout', { bubbles: true })));
+    expect(second.dataset.z).toBe(first.dataset.z);
+
+    await act(async () => container.querySelector('.gmap-restaurant').click());
+    const selected = container.querySelector('.gmap-restaurant.is-selected').parentElement;
+    expect(Number(selected.dataset.z)).toBeGreaterThan(courierZ);
   });
 
   it('hides and shows labels with the toggle', async () => {
@@ -142,6 +245,7 @@ describe('Google city map', () => {
 
     expect(container.querySelector('.mock-map')).not.toBeNull();
     expect(google.mapProps.defaultCenter).toEqual({ lat: 45.5017, lng: -73.5673 });
+    expect(container.querySelector('.gmap-fit')).toBeNull();
     expect(container.querySelector('.map-empty').textContent).toBe('No restaurants or couriers to display yet.');
     expect(google.fitBounds).not.toHaveBeenCalled();
   });
