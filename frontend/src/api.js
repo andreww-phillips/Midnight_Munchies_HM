@@ -41,6 +41,10 @@ export const api = {
   }),
   logout: () => request("/api/auth/logout", { method: "POST" }),
   restaurants: () => request("/api/ord/restaurants"),
+  changeRestaurantStatus: (restaurantId, status) => request(`/api/ord/restaurants/${restaurantId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status })
+  }),
   menu: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/menu`),
   addMenuItem: (restaurantId, name, price) => request(`/api/ord/restaurants/${restaurantId}/menu`, {
     method: "POST",
@@ -62,6 +66,9 @@ export const api = {
     body: JSON.stringify({ lines })
   }),
   orders: () => request("/api/ord/orders"),
+  cancelOrder: (orderId) => request(`/api/ord/orders/${orderId}/cancel`, { method: "POST" }),
+  orderHistory: () => request("/api/prc/history"),
+  refundOrder: (orderId) => request(`/api/prc/orders/${orderId}/refund`, { method: "POST" }),
   orderSummary: (orderId) => request(`/api/prc/orders/${orderId}/summary`),
   preparationQueue: (restaurantId) => request(`/api/ord/restaurants/${restaurantId}/preparation`),
   acceptOrder: (restaurantId, orderId) => request(`/api/ord/restaurants/${restaurantId}/orders/${orderId}/accept`, {
@@ -99,5 +106,6 @@ export const api = {
     method: "POST"
   }),
   operatorDeliveries: () => request("/api/dlv/operator/deliveries"),
+  resetSimulator: () => request("/api/dash/reset", { method: "POST" }),
   cityMap: () => request("/api/dash/map")
 };

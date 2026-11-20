@@ -18,6 +18,7 @@ import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.RestaurantRepository;
 import com.midnightmunchies.domain.ord.RestaurantStatus;
 import com.midnightmunchies.domain.prc.LedgerEntry;
+import com.midnightmunchies.domain.prc.Fare;
 import com.midnightmunchies.domain.prc.OrderSummary;
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
@@ -42,6 +43,7 @@ class OrderLedgerIntegrationTests {
     @Autowired private CourierService delivery;
     @Autowired private LedgerRepository ledger;
     @Autowired private BillingService billing;
+    @Autowired private PricingService pricing;
     @Autowired private RestaurantRepository restaurants;
     @Autowired private MenuItemRepository menu;
     @Autowired private OrderEventLog eventLog;
@@ -61,7 +63,7 @@ class OrderLedgerIntegrationTests {
     }
 
     @Test
-    void existingServicesRecordPlacementThroughDeliveryWithoutPricingOrLifecycleChanges() {
+    void existingServicesRecordAndPriceDeliveryUsingOriginalPurchaseFacts() {
         Order order = place();
         LedgerEntry placed = record(order);
         assertEquals(OrderStatus.PLACED, placed.status());
@@ -93,7 +95,13 @@ class OrderLedgerIntegrationTests {
         assertEquals(OrderStatus.DELIVERED, order.getStatus());
         assertEquals(CourierState.IDLE, delivery.view(courier).state());
         assertEquals(courierId, completed.courierId());
-        assertNull(completed.totalCharge());
+        Fare expected = pricing.calculateFare(order);
+        assertEquals(expected.total(), completed.totalCharge());
+        assertNotNull(completed.charge());
+        assertEquals(expected.subtotal(), completed.charge().itemSubtotal());
+        assertEquals(expected.deliveryFee(), completed.charge().deliveryFee());
+        assertEquals(expected.serviceFee(), completed.charge().serviceFee());
+        assertEquals(expected.smallOrderSurcharge(), completed.charge().smallOrderSurcharge());
         assertEquals("Poutine", completed.orderLines().getFirst().getMenuItemName());
         assertEquals(new BigDecimal("12.35"), completed.orderLines().getFirst().getUnitPrice());
         List<OrderEvent> events = eventLog.findByOrderId(order.getId());
@@ -106,8 +114,9 @@ class OrderLedgerIntegrationTests {
         assertEquals(completed.timestamps().get(OrderStatus.DELIVERED), summary.getDeliveredAt());
         assertEquals("Poutine", summary.getOrderLines().getFirst().getMenuItemName());
         assertEquals(new BigDecimal("12.35"), summary.getOrderLines().getFirst().getUnitPrice());
-        assertTrue(summary.isPricingPending());
-        assertNull(summary.getTotalCharge());
+        assertFalse(summary.isPricingPending());
+        assertEquals(expected.total(), summary.getTotalCharge());
+        assertEquals(completed.charge(), summary.getCharge());
         assertEquals(OrderStatus.PLACED, placed.status());
         assertEquals(1, placed.timestamps().size());
         delivery.setDuty(courier, false);

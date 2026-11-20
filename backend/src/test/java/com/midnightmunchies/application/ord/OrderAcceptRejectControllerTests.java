@@ -59,7 +59,7 @@ class OrderAcceptRejectControllerTests {
         ownerSession = login(owner);
         customerSession = login(register(UserRole.CUSTOMER));
         restaurantId = UUID.randomUUID();
-        restaurants.save(new Restaurant(restaurantId, UUID.fromString(owner.id()), "Diner", RestaurantStatus.OPEN, 0, 0));
+        restaurants.save(new Restaurant(restaurantId, UUID.fromString(owner.id()), "Diner " + restaurantId, RestaurantStatus.OPEN, 0, 0));
     }
 
     @Test

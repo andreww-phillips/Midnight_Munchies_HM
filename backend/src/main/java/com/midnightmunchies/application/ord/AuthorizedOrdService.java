@@ -5,6 +5,7 @@ import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderEvent;
 import com.midnightmunchies.domain.ord.Restaurant;
+import com.midnightmunchies.domain.ord.RestaurantStatus;
 import com.midnightmunchies.domain.ord.RestaurantRepository;
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
@@ -41,6 +42,22 @@ public class AuthorizedOrdService implements OrdService {
     public List<Restaurant> browseRestaurants(HttpSession session) {
         requireAuthenticated(session);
         return realService.browseRestaurants(session);
+    }
+
+    @Override
+    public Restaurant changeRestaurantStatus(UUID restaurantId, RestaurantStatus status, HttpSession session) {
+        UserAccount user = requireAuthenticated(session);
+        if (user.role() == UserRole.PLATFORM_OPERATOR) {
+            requireRestaurant(restaurantId);
+        } else {
+            requireOwner(restaurantId, session,
+                    "Only restaurant staff and operators can pause restaurants",
+                    "Staff can only pause their own restaurant");
+            if (status != RestaurantStatus.PAUSED) {
+                throw new AuthorizationException("Only operators can reopen restaurants");
+            }
+        }
+        return realService.changeRestaurantStatus(restaurantId, status, session);
     }
 
     @Override

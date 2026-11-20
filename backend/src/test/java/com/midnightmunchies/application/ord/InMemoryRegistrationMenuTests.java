@@ -24,24 +24,27 @@ class InMemoryRegistrationMenuTests {
     private static final String MENU = "/api/ord/restaurants/{id}/menu";
 
     @Test
-    void registeringStaffCreatesAnOwnedRestaurantAndAllowsRepeatedItemsWithOnlyNameAndPrice() throws Exception {
+    void registeringStaffCreatesAnOwnedRestaurantAndRequiresUniqueItemNamesWithinItsMenu() throws Exception {
         MockHttpSession staff = new MockHttpSession();
-        String restaurantId = register(staff, "RESTAURANT_STAFF", "Memory Diner");
+        String restaurantId = register(staff, "RESTAURANT_STAFF", "Memory Diner " + UUID.randomUUID());
         String restaurants = mvc.perform(get("/api/ord/restaurants").session(staff))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         List<String> owners = JsonPath.read(restaurants, "$[?(@.id == '" + restaurantId + "')].ownerId");
         assertEquals(List.of(restaurantId), owners);
 
         String drinkId = add(staff, restaurantId, "Drink", "3.99");
-        String secondDrinkId = add(staff, restaurantId, "Drink", "3.99");
-        add(staff, restaurantId, "French Fries", "5.99");
-        assertNotEquals(drinkId, secondDrinkId);
+        mvc.perform(post(MENU, restaurantId).session(staff).contentType(APPLICATION_JSON)
+                        .content("{\"name\":\"  dRiNk  \",\"price\":\"3.99\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("This restaurant already has a menu item with this name."));
+        add(staff, restaurantId, "French Fries", "3.99");
         mvc.perform(get(MENU, restaurantId).session(staff)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(3));
+                .andExpect(jsonPath("$.length()").value(2));
 
         MockHttpSession otherStaff = new MockHttpSession();
-        String otherRestaurantId = register(otherStaff, "RESTAURANT_STAFF", "Other Memory Diner");
-        add(otherStaff, otherRestaurantId, "Drink", "3.99");
+        String otherRestaurantId = register(otherStaff, "RESTAURANT_STAFF", "Other Memory Diner " + UUID.randomUUID());
+        String otherDrinkId = add(otherStaff, otherRestaurantId, "Drink", "3.99");
+        assertNotEquals(drinkId, otherDrinkId);
         mvc.perform(put(MENU + "/{item}", restaurantId, drinkId).session(otherStaff)
                         .contentType(APPLICATION_JSON).content("{\"name\":\"Stolen\",\"price\":\"0\"}"))
                 .andExpect(status().isForbidden());
@@ -76,7 +79,7 @@ class InMemoryRegistrationMenuTests {
     @Test
     void registeredStaffCanEditToggleAndRemoveItemsWhileExistingOrdersKeepTheirDetails() throws Exception {
         MockHttpSession staff = new MockHttpSession();
-        String restaurantId = register(staff, "RESTAURANT_STAFF", "Order Diner");
+        String restaurantId = register(staff, "RESTAURANT_STAFF", "Order Diner " + UUID.randomUUID());
         String itemId = add(staff, restaurantId, "Drink", "3.99");
         MockHttpSession customer = new MockHttpSession();
         register(customer, "CUSTOMER", null);

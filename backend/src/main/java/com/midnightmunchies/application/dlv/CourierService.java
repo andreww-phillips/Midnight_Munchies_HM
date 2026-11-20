@@ -74,6 +74,16 @@ public class CourierService implements OrderEventListener {
         restoreQueuedOrders();
     }
 
+    /** Internal reset operation; the application coordinator must exclude other module commands. */
+    public void resetToInitialState() {
+        synchronized (dispatchLock) {
+            dispatchQueue.resetToInitialState();
+            assignments.clear();
+            // Couriers are created offline on first use; their starting positions derive from account IDs.
+            couriers.clear();
+        }
+    }
+
     public CourierDashboard view(UserAccount account) {
         Courier courier = requireCourier(account);
         synchronized (dispatchLock) {

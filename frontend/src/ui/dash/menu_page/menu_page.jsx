@@ -5,7 +5,7 @@ import { dishImageUrl } from "../storage";
 import "./menu_page.css";
 import { useCommandLog } from "../output_console/command_log";
 
-export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced }) {
+export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced, availabilityError = '' }) {
   const { record } = useCommandLog();
   const commandBusy = useRef(false);
   const [menuItems, setMenuItems] = useState([]);
@@ -13,15 +13,18 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(null);
   const [error, setError] = useState("");
+  const [menuAvailabilityError, setMenuAvailabilityError] = useState('');
   const [editingItemId, setEditingItemId] = useState(null);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const canManage = user?.role === "RESTAURANT_STAFF" && Boolean(user.id) && restaurant.ownerId === user.id;
   const canOrder = user?.role === "CUSTOMER";
+  const restaurantOpen = restaurant.status === "OPEN";
   const busy = loading || pending !== null;
 
   const applyMenu = useCallback((items) => {
     setMenuItems(items);
+    setMenuAvailabilityError('');
     setCart((previous) => Object.fromEntries(items
       .filter((item) => item.status === "AVAILABLE" && previous[item.id] > 0)
       .map((item) => [item.id, previous[item.id]])));
@@ -31,15 +34,49 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
     let active = true;
     api.menu(restaurant.id)
       .then((items) => { if (active) applyMenu(items); })
-      .catch((loadError) => { if (active) setError(loadError.message); })
+      .catch((loadError) => {
+        if (!active) return;
+        setError(loadError.message);
+        record({ action: 'Load menu', outcome: 'error', restaurantId: restaurant.id,
+          message: loadError.message, httpStatus: loadError.status });
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [restaurant.id, applyMenu]);
+  }, [restaurant.id, applyMenu, record]);
+
+  useEffect(() => {
+    if (!canOrder || loading || pending !== null) return undefined;
+    let active = true;
+    let inFlight = false;
+    let failed = false;
+    const timer = window.setInterval(async () => {
+      if (inFlight || commandBusy.current) return;
+      inFlight = true;
+      try {
+        const items = await api.menu(restaurant.id);
+        if (!active) return;
+        applyMenu(items);
+        failed = false;
+      } catch (loadError) {
+        if (!active) return;
+        setMenuAvailabilityError(loadError.message);
+        if (!failed) record({ action: 'Refresh menu availability', outcome: 'error',
+          restaurantId: restaurant.id, message: loadError.message, httpStatus: loadError.status });
+        failed = true;
+      } finally {
+        inFlight = false;
+      }
+    }, 5000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [canOrder, loading, pending, restaurant.id, applyMenu, record]);
 
   const refreshMenu = async () => {
     setLoading(true);
     try {
       applyMenu(await api.menu(restaurant.id));
+    } catch (loadError) {
+      setMenuAvailabilityError(loadError.message);
+      throw loadError;
     } finally {
       setLoading(false);
     }
@@ -116,7 +153,8 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
   const total = cartLines.reduce((sum, line) => sum + Number(line.item.price) * line.quantity, 0);
 
   const placeOrder = async () => {
-    if (!canOrder || busy || commandBusy.current || !cartLines.length) return;
+    if (!canOrder || !restaurantOpen || availabilityError || menuAvailabilityError
+        || busy || commandBusy.current || !cartLines.length) return;
     commandBusy.current = true;
     setError("");
     setPending("order");
@@ -162,8 +200,12 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
         </div>
       </div>
       {error && <p className="error-message" role="alert">{error}</p>}
+      {canOrder && (availabilityError || menuAvailabilityError) && (
+        <p role="alert">Ordering availability could not be refreshed: {availabilityError || menuAvailabilityError}</p>
+      )}
       {loading && <p className="muted" role="status">Loading menu...</p>}
       {pending === "menu" && <p className="muted" role="status">Updating menu...</p>}
+      {canOrder && !restaurantOpen && <p className="muted">This restaurant is not open for orders.</p>}
       {user?.role === "RESTAURANT_STAFF" && !canManage && (
         <p className="muted">Only staff assigned to this restaurant can manage its menu.</p>
       )}
@@ -228,7 +270,8 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
         })}
       </div>
       {canOrder && (
-        <button className="primary-button order-button" type="button" disabled={busy || !cartLines.length} onClick={placeOrder}>
+        <button className="primary-button order-button" type="button"
+          disabled={!restaurantOpen || Boolean(availabilityError || menuAvailabilityError) || busy || !cartLines.length} onClick={placeOrder}>
           {pending === "order" ? "Placing order..." : "Place order · " + formatPrice(total)}
         </button>
       )}

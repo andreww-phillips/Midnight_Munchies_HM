@@ -6,6 +6,7 @@ import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.Restaurant;
+import com.midnightmunchies.domain.ord.RestaurantStatus;
 import com.midnightmunchies.technicalservices.CatalogAccessException;
 import com.midnightmunchies.application.reg.AuthenticationRequiredException;
 import jakarta.servlet.http.HttpSession;
@@ -42,6 +43,15 @@ public class OrdController {
     @GetMapping("/restaurants")
     public ResponseEntity<?> restaurants(HttpSession session) {
         return execute(() -> authorizedService.browseRestaurants(session));
+    }
+
+    @PatchMapping("/restaurants/{restaurantId}/status")
+    public ResponseEntity<?> changeRestaurantStatus(
+            @PathVariable UUID restaurantId,
+            @RequestBody RestaurantStatusRequest request,
+            HttpSession session
+    ) {
+        return execute(() -> authorizedService.changeRestaurantStatus(restaurantId, request.toStatus(), session));
     }
 
     @GetMapping("/restaurants/{restaurantId}/menu")
@@ -198,6 +208,14 @@ public class OrdController {
     }
 
     public record PlaceOrderRequest(List<OrdService.OrderLineRequest> lines) {
+    }
+
+    public record RestaurantStatusRequest(String status) {
+        public RestaurantStatus toStatus() {
+            if ("OPEN".equals(status)) return RestaurantStatus.OPEN;
+            if ("PAUSED".equals(status)) return RestaurantStatus.PAUSED;
+            throw new IllegalArgumentException("Restaurant status must be OPEN or PAUSED");
+        }
     }
 
     public record RejectOrderRequest(String reason) {

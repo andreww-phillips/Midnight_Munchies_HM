@@ -2,7 +2,7 @@ package com.midnightmunchies.domain.ord;
 
 /**
  * Status vocabulary; transition rules are enforced by OrderState implementations.
- * REFUNDED is reserved for future lifecycle support.
+ * Only delivered orders can transition to REFUNDED.
  */
 public enum OrderStatus {
 	PLACED,

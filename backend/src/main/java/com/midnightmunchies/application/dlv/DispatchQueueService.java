@@ -82,6 +82,13 @@ public class DispatchQueueService {
         return List.copyOf(queuedOrders.values());
     }
 
+    /** Persist first so a failed write leaves the running queue untouched. */
+    public synchronized void resetToInitialState() {
+        persist(List.of());
+        queue.clear();
+        queuedOrders.clear();
+    }
+
     private void load() {
         if (!Files.exists(storageFile)) {
             return;

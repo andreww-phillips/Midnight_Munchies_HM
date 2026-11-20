@@ -41,8 +41,23 @@ describe("restaurant order API", () => {
   beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
   afterEach(() => vi.unstubAllGlobals());
 
+  it("resets through the operator session without client-supplied seed data", async () => {
+    const restored = { status: "RESET", revision: 1, message: "Initial simulator state restored." };
+    fetch.mockResolvedValue(new Response(JSON.stringify(restored), { status: 200 }));
+    await expect(api.resetSimulator()).resolves.toEqual(restored);
+    const [url, options] = fetch.mock.calls[0];
+    expect(new URL(url).pathname).toBe("/api/dash/reset");
+    expect(options).toMatchObject({ method: "POST", credentials: "include" });
+    expect(options.body).toBeUndefined();
+  });
+
   it.each([
     ["orders", () => api.orders(), "GET", "/api/ord/orders", undefined, []],
+    ["cancel", () => api.cancelOrder("order-1"), "POST", "/api/ord/orders/order-1/cancel", undefined, { id: "order-1", status: "CANCELLED" }],
+    ["pause restaurant", () => api.changeRestaurantStatus("restaurant-1", "PAUSED"), "PATCH", "/api/ord/restaurants/restaurant-1/status", { status: "PAUSED" }, { status: "PAUSED" }],
+    ["reopen restaurant", () => api.changeRestaurantStatus("restaurant-1", "OPEN"), "PATCH", "/api/ord/restaurants/restaurant-1/status", { status: "OPEN" }, { status: "OPEN" }],
+    ["history", () => api.orderHistory(), "GET", "/api/prc/history", undefined, []],
+    ["refund", () => api.refundOrder("order-1"), "POST", "/api/prc/orders/order-1/refund", undefined, { orderId: "order-1", status: "REFUNDED" }],
     ["summary", () => api.orderSummary("order-1"), "GET", "/api/prc/orders/order-1/summary", undefined, { orderId: "order-1", totalCharge: null, pricingPending: true }],
     ["queue", () => api.preparationQueue("restaurant-1"), "GET", "/api/ord/restaurants/restaurant-1/preparation", undefined, []],
     ["accept", () => api.acceptOrder("restaurant-1", "order-1"), "POST", "/api/ord/restaurants/restaurant-1/orders/order-1/accept", undefined, { status: "ACCEPTED" }],

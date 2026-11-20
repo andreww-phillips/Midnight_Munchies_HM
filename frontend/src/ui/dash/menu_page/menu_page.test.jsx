@@ -10,7 +10,7 @@ vi.mock("../../../api", () => ({
   api: {
     menu: vi.fn(), addMenuItem: vi.fn(), editMenuItem: vi.fn(), removeMenuItem: vi.fn(),
     changeMenuItemAvailability: vi.fn(), placeOrder: vi.fn(),
-    currentUser: vi.fn(), restaurants: vi.fn(), orders: vi.fn()
+    currentUser: vi.fn(), restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn()
   }
 }));
 
@@ -225,6 +225,36 @@ describe("staff menu management", () => {
 });
 
 describe("customer ordering", () => {
+  it.each(["PAUSED", "CLOSED"])("blocks checkout at a restaurant that is initially %s", async (status) => {
+    await renderMenu(customer, { ...restaurant, status });
+    await click(button("Add one Poutine"));
+
+    expect(container.textContent).toContain("This restaurant is not open for orders.");
+    expect(container.querySelector(".order-button").disabled).toBe(true);
+    await click(container.querySelector(".order-button"));
+    expect(api.placeOrder).not.toHaveBeenCalled();
+  });
+
+  it.each(["PAUSED", "CLOSED"])("preserves the cart when the restaurant becomes %s and permits checkout after reopening", async (status) => {
+    api.placeOrder.mockResolvedValue({ id: "order-1" });
+    await renderMenu(customer);
+    await click(button("Add one Poutine"));
+    expect(container.querySelector(".order-button").disabled).toBe(false);
+
+    await renderMenu(customer, { ...restaurant, status });
+    expect(container.querySelector(".order-button").disabled).toBe(true);
+    await click(container.querySelector(".order-button"));
+    expect(api.placeOrder).not.toHaveBeenCalled();
+
+    await renderMenu(customer);
+    expect(container.querySelector(".order-button").disabled).toBe(false);
+    expect(container.textContent).not.toContain("This restaurant is not open for orders.");
+    await click(container.querySelector(".order-button"));
+    expect(api.placeOrder).toHaveBeenCalledExactlyOnceWith(restaurant.id, [
+      { menuItemId: available.id, quantity: 1 }
+    ]);
+  });
+
   it("labels sold-out items, prevents selecting them, and retains normal ordering", async () => {
     const order = { id: "order-1" };
     const onOrderPlaced = vi.fn();
@@ -291,6 +321,7 @@ describe("active application integration", () => {
   beforeEach(() => {
     api.restaurants.mockResolvedValue([restaurant, { ...restaurant, id: "restaurant-2", ownerId: "other-owner", name: "Other Diner" }]);
     api.orders.mockResolvedValue([]);
+  api.orderHistory.mockResolvedValue([]);
   });
 
   it("uses the restored session and hides management when staff selects another restaurant", async () => {
@@ -308,7 +339,7 @@ describe("active application integration", () => {
     api.currentUser.mockResolvedValue(customer);
     const placed = { id: "order-12345678", status: "PLACED", orderLines: [{ menuItemId: available.id, menuItemName: "Poutine", quantity: 1, unitPrice: "12.35" }] };
     api.placeOrder.mockResolvedValue(placed);
-    api.orders.mockResolvedValueOnce([]).mockResolvedValue([placed]);
+    api.orderHistory.mockResolvedValueOnce([]).mockResolvedValue([{ ...placed, orderId: placed.id }]);
     await act(async () => root.render(<RegistrationPage />));
     await click(container.querySelector(".restaurant-card button"));
     await click(button("Add one Poutine"));

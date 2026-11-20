@@ -21,7 +21,7 @@ class InMemoryMenuItemRepositoryTests {
 	void savesItemsAndFiltersByRestaurantWithoutMixingMenus() {
 		UUID restaurantId = UUID.randomUUID();
 		MenuItem first = item(UUID.randomUUID(), restaurantId, "12.35", MenuItemStatus.AVAILABLE);
-		MenuItem second = item(UUID.randomUUID(), restaurantId, "5.00", MenuItemStatus.SOLD_OUT);
+		MenuItem second = new MenuItem(UUID.randomUUID(), restaurantId, "Fries", new BigDecimal("5.00"), MenuItemStatus.SOLD_OUT);
 		MenuItem other = item(UUID.randomUUID(), UUID.randomUUID(), "8.00", MenuItemStatus.AVAILABLE);
 
 		assertSame(first, repository.save(first));
@@ -70,7 +70,7 @@ class InMemoryMenuItemRepositoryTests {
 	void deletingMenuItemRemovesItFromCurrentLookupsAndMenusWithoutAffectingOtherItems() {
 		UUID restaurantId = UUID.randomUUID();
 		MenuItem removed = item(UUID.randomUUID(), restaurantId, "12.35", MenuItemStatus.AVAILABLE);
-		MenuItem retained = item(UUID.randomUUID(), restaurantId, "5.00", MenuItemStatus.SOLD_OUT);
+		MenuItem retained = new MenuItem(UUID.randomUUID(), restaurantId, "Fries", new BigDecimal("5.00"), MenuItemStatus.SOLD_OUT);
 		MenuItem other = item(UUID.randomUUID(), UUID.randomUUID(), "8.00", MenuItemStatus.AVAILABLE);
 		repository.save(removed);
 		repository.save(retained);

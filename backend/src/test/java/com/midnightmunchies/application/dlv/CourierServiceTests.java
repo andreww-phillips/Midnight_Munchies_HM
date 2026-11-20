@@ -26,7 +26,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.List;
+import java.util.Comparator;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -54,6 +56,21 @@ class CourierServiceTests {
         restaurants = new InMemoryRestaurantRepository();
         service = new CourierService(couriers, assignments, orders, restaurants, queue,
                 new OrderTransitions(orders, new OrderEventPublisher()));
+    }
+
+    @Test
+    void failedQueueResetKeepsCourierAndAssignmentState() throws Exception {
+        UserAccount courier = account(UserRole.COURIER);
+        Order ready = order(true);
+        service.setDuty(courier, true);
+        service.onEvent(event(ready, OrderStatus.PREPARING, OrderStatus.READY));
+        UUID assignmentId = service.view(courier).assignment().assignment().id();
+        Files.createDirectory(tempDir.resolve("dispatch-queue.txt.tmp"));
+
+        assertThrows(IllegalStateException.class, service::resetToInitialState);
+        assertTrue(couriers.findById(id(courier)).isPresent());
+        assertEquals(assignmentId, assignments.findActiveByOrderId(ready.getId()).orElseThrow().id());
+        assertEquals(List.of(ready.getId()), queue.view());
     }
 
     @Test
@@ -204,7 +221,7 @@ class CourierServiceTests {
         assertEquals(AssignmentStatus.OFFERED, row.status());
         assertTrue(row.reassignable());
         assertTrue(row.waitingSeconds() >= 0);
-        assertEquals(List.of(waiting.getId()), view.queued());
+        assertEquals(List.of(offered.getId(), waiting.getId()), view.queued());
         assertThrows(com.midnightmunchies.application.ord.AuthorizationException.class,
                 () -> service.operatorDeliveries(courier));
     }
@@ -270,8 +287,11 @@ class CourierServiceTests {
 
     @Test
     void keepsFifoOrdersQueuedWhileOfferedAndOnlyDequeuesEachOnAcceptance() {
-        UserAccount firstCourier = account(UserRole.COURIER);
-        UserAccount secondCourier = account(UserRole.COURIER);
+        // These orders have no catalog restaurant, so dispatch falls back to the lowest courier ID.
+        List<UserAccount> candidates = List.of(account(UserRole.COURIER), account(UserRole.COURIER)).stream()
+                .sorted(Comparator.comparing(UserAccount::id)).toList();
+        UserAccount firstCourier = candidates.get(0);
+        UserAccount secondCourier = candidates.get(1);
         service.setDuty(firstCourier, true);
         service.setDuty(secondCourier, true);
         Order first = order(true);

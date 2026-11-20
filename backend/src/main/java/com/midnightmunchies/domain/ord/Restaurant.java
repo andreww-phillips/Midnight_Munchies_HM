@@ -57,6 +57,10 @@ public final class Restaurant {
 		return status;
 	}
 
+	public Restaurant withStatus(RestaurantStatus newStatus) {
+		return new Restaurant(id, ownerId, name, newStatus, latitude, longitude, logo, menu);
+	}
+
 	public double getLatitude() {
 		return latitude;
 	}

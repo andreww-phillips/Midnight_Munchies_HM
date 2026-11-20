@@ -24,7 +24,8 @@ export function CommandLogProvider({ children }) {
     if (scope.current.identity === identity && !entry) return;
     const generation = scope.current.generation + 1;
     scope.current = { identity, generation };
-    setHistory({ generation, entries: entry ? [makeEntry(entry)] : [] });
+    const initialEntries = entry ? (Array.isArray(entry) ? entry : [entry]) : [];
+    setHistory({ generation, entries: initialEntries.map(makeEntry).slice(-100) });
   }, [makeEntry]);
 
   const value = useMemo(() => ({ entries: history.entries, record, changeIdentity }), [history.entries, record, changeIdentity]);

@@ -108,7 +108,8 @@ function RestaurantOrders({ restaurant, onSessionExpired }) {
         if (!active) return;
         setError(loadError.message);
         setLoadFailed(true);
-        if (refresh > 0) record({ action: 'Refresh restaurant orders', outcome: 'error', restaurantId: restaurant.id, message: loadError.message, httpStatus: loadError.status });
+        record({ action: refresh > 0 ? 'Refresh restaurant orders' : 'Load restaurant orders', outcome: 'error',
+          restaurantId: restaurant.id, message: loadError.message, httpStatus: loadError.status });
         if (loadError.status === 401) onSessionExpired?.('Your session expired. Please log in again.');
       })
       .finally(() => { if (active) { setLoading(false); requestBusy.current = false; } });

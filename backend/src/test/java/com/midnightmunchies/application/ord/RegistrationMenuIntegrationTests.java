@@ -196,7 +196,7 @@ class RegistrationMenuIntegrationTests {
     }
 
     @Test
-    void itemsWithOnlyNameAndPriceCanRepeatWithinAndAcrossRestaurants() throws Exception {
+    void itemsWithOnlyNameAndPriceRequireUniqueNamesWithinEachRestaurantButMayRepeatAcrossRestaurants() throws Exception {
         MockHttpSession staff = new MockHttpSession();
         String staffId = register(staff, "RESTAURANT_STAFF");
         TABLES.get("Restaurant").put(staffId, JSON.readTree("{\"id\":\"%s\",\"restaurant_name\":\"Diner\"}".formatted(staffId)));
@@ -226,8 +226,10 @@ class RegistrationMenuIntegrationTests {
         assertTrue(TABLES.get("Menu_Items").get(friesId).get("item_image").isNull());
         assertTrue(TABLES.get("Menu_Items").get(friesId).get("item_description").isEmpty());
         mvc.perform(post(MENU, staffId).session(staff).contentType(APPLICATION_JSON)
-                        .content("{\"name\":\"Drink\",\"price\":\"3.99\"}"))
-                .andExpect(status().isCreated());
+                        .content("{\"name\":\"  dRiNk  \",\"price\":\"3.99\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("This restaurant already has a menu item with this name."));
+        assertEquals(2, TABLES.get("Menu_Items").size());
 
         MockHttpSession otherStaff = new MockHttpSession();
         String otherStaffId = register(otherStaff, "RESTAURANT_STAFF");
@@ -235,7 +237,7 @@ class RegistrationMenuIntegrationTests {
         mvc.perform(post(MENU, otherStaffId).session(otherStaff).contentType(APPLICATION_JSON)
                         .content("{\"name\":\"Drink\",\"price\":\"3.99\"}"))
                 .andExpect(status().isCreated());
-        assertEquals(4, TABLES.get("Menu_Items").size());
+        assertEquals(3, TABLES.get("Menu_Items").size());
     }
 
     @Test
@@ -266,11 +268,16 @@ class RegistrationMenuIntegrationTests {
         mvc.perform(post(MENU, staffId).session(staff).contentType(APPLICATION_JSON)
                         .content("{\"name\":\"Drink\",\"price\":\"3.99\"}"))
                 .andExpect(status().isCreated());
+        MockHttpSession otherStaff = new MockHttpSession();
+        String otherStaffId = register(otherStaff, "RESTAURANT_STAFF");
+        TABLES.get("Restaurant").put(otherStaffId, JSON.readTree("{\"id\":\"%s\",\"restaurant_name\":\"Other Diner\"}".formatted(otherStaffId)));
         legacyUniqueNames = true;
-        mvc.perform(post(MENU, staffId).session(staff).contentType(APPLICATION_JSON)
+        // Across restaurants this name is valid; only the obsolete global database constraint rejects it.
+        mvc.perform(post(MENU, otherStaffId).session(otherStaff).contentType(APPLICATION_JSON)
                         .content("{\"name\":\"Drink\",\"price\":\"3.99\"}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("issue 7 schema update")));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("latest catalog schema updates")))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("names may repeat across restaurants")));
         assertEquals(1, TABLES.get("Menu_Items").size());
     }
 

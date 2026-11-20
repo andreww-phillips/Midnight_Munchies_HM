@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.math.BigDecimal;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -53,6 +54,43 @@ class DispatchQueueServiceTests {
 
         assertThrows(IllegalArgumentException.class, () -> queue.enqueue(placed));
         assertTrue(queue.view().isEmpty());
+    }
+
+    @Test
+    void resetEmptiesBothQueueAndStoredSnapshotsAcrossRestartAndAllowsFreshOrders() {
+        Path queueFile = tempDir.resolve("reset-queue.txt");
+        DispatchQueueService queue = new DispatchQueueService(queueFile);
+        Order first = readyOrder("First Meal");
+        queue.enqueue(first);
+        queue.enqueue(readyOrder("Second Meal"));
+
+        queue.resetToInitialState();
+        assertTrue(queue.view().isEmpty());
+        assertTrue(queue.restoreOrders().isEmpty());
+        DispatchQueueService restarted = new DispatchQueueService(queueFile);
+        assertTrue(restarted.view().isEmpty());
+        assertTrue(restarted.restoreOrders().isEmpty());
+        // Reset must also clear membership checks, so an ID from the old scenario can be reused.
+        restarted.enqueue(first);
+        assertEquals(List.of(first.getId()), restarted.view());
+        restarted.resetToInitialState();
+        restarted.resetToInitialState();
+        assertTrue(new DispatchQueueService(queueFile).view().isEmpty());
+    }
+
+    @Test
+    void failedResetPreservesTheRunningQueueAndItsPersistedFile() throws Exception {
+        Path queueFile = tempDir.resolve("reset-failure.txt");
+        DispatchQueueService queue = new DispatchQueueService(queueFile);
+        Order first = readyOrder("First Meal");
+        queue.enqueue(first);
+        // Block the temporary output path without changing the persisted queue.
+        Files.createDirectory(tempDir.resolve("reset-failure.txt.tmp"));
+
+        assertThrows(IllegalStateException.class, queue::resetToInitialState);
+        assertEquals(List.of(first.getId()), queue.view());
+        assertEquals(1, queue.restoreOrders().size());
+        assertEquals(List.of(first.getId()), new DispatchQueueService(queueFile).view());
     }
 
     private Order readyOrder(String menuItemName) {

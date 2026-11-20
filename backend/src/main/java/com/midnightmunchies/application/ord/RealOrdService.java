@@ -91,6 +91,16 @@ public class RealOrdService implements OrdService {
     }
 
     @Override
+    public Restaurant changeRestaurantStatus(UUID restaurantId, RestaurantStatus status, HttpSession session) {
+        if (status != RestaurantStatus.OPEN && status != RestaurantStatus.PAUSED) {
+            throw new IllegalArgumentException("Restaurant status must be OPEN or PAUSED");
+        }
+        requireRestaurant(restaurantId);
+        Restaurant restaurant = restaurantRepository.findById(restaurantId).orElseThrow();
+        return restaurantRepository.save(restaurant.withStatus(status));
+    }
+
+    @Override
     public List<MenuItem> browseMenu(UUID restaurantId, HttpSession session) {
         return menuItemRepository.findByRestaurantId(restaurantId);
     }

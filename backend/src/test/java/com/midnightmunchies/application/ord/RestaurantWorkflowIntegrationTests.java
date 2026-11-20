@@ -156,7 +156,7 @@ class RestaurantWorkflowIntegrationTests {
         String username = UUID.randomUUID() + "@example.com";
         MockHttpSession registration = new MockHttpSession();
         String response = mvc.perform(post("/api/auth/register").session(registration).contentType(APPLICATION_JSON)
-                        .content("{\"username\":\"%s\",\"password\":\"password\",\"role\":\"%s\",\"restaurantName\":\"Workflow Diner\"}".formatted(username, role)))
+                        .content("{\"username\":\"%s\",\"password\":\"password\",\"role\":\"%s\",\"restaurantName\":\"Workflow Diner %s\"}".formatted(username, role, username)))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String id = JsonPath.read(response, "$.id");
         mvc.perform(post("/api/auth/logout").session(registration)).andExpect(status().isNoContent());

@@ -93,6 +93,16 @@ npm run dev
 
 Open the URL printed by Vite, usually `http://localhost:5173`.
 
+### Resetting the simulation
+
+Log in as `operator@example.com` with password `password`, select **Reset
+simulator**, then **Confirm reset**. Reset restores the initial catalog and
+accounts and clears orders, preparation queues, deliveries, billing, refunds,
+and the persisted dispatch queue. Seeded accounts retain their identities and
+sessions; accounts created since startup are removed and their sessions revoked.
+The dashboard reloads its current view and clears old selections and console
+history, retaining the Reset result.
+
 ### Stopping the Application
 
 Press `Ctrl+C` in each terminal running the backend or frontend.
@@ -124,30 +134,24 @@ npm run build
 Backend tests use memory or an isolated local HTTP fixture; they never access
 the shared Supabase database. Frontend tests mock backend API calls.
 
-## Verifying issue 7
+## Running with Docker
 
-1. Start the backend and frontend. No database setup is needed.
-2. Log in as `restaurant@example.com` with password `password`. Open
-   **Bobs Burgers** and select **Edit menu**. This demo account owns that restaurant.
-   Alternatively, register **Restaurant Staff** with a username, password and
-   restaurant name; the backend creates its owned restaurant immediately. Logo
-   and menu-file selections are optional and kept locally in memory.
-3. Add **Drink / 3.99**, **French Fries / 5.99**, and another **Drink / 3.99**.
-   Menu items require only a name and price. Names and prices may repeat within
-   and across restaurants.
-4. Edit a name or price, mark an item sold out and available again, then remove
-   an item. Staff can only manage their own restaurant's menu.
-5. Use a private browser session to log in as `customer@example.com` with password
-   `password`, or register a customer account. Browse the menu and place an order.
-   Sold-out and removed items cannot be ordered.
-6. After placing an order, edit or remove the item as staff. Refresh the customer's
-   orders: the original item name, unit price and quantity remain unchanged.
+Docker runs the backend and the frontend in containers, with no local Java or
+Node.js install. Install Docker Desktop, then run this from the repository root:
 
-Other demo logins are `courier@example.com` and `operator@example.com`, both with
-password `password`. Couriers can browse; menu management is restricted to owning
-restaurant staff. Accounts, restaurants, menus, and orders reset when the
-backend restarts; ready orders still awaiting courier assignment are restored
-from the dispatch queue file.
+```bash
+docker compose up --build
+```
 
-See [the issue 7 integration notes](docs/issue-7-integration.md) for the exact
-regression history and current implementation.
+The frontend is served at `http://localhost:5173` and the backend API at
+`http://localhost:8080`. The backend only accepts browser requests from
+`http://localhost:5173`, so keep that port for the frontend.
+
+Stop the containers with `Ctrl+C`, or `docker compose down`. Accounts, orders and
+menus live in memory and reset when the backend container restarts. The FIFO
+dispatch queue file is kept in the `backend-data` volume;
+`docker compose down -v` deletes it too.
+
+Optional settings (Supabase mode, Google Maps keys) go in a `.env` file at the
+repository root. `.env.example` lists every variable. Frontend values are baked
+into the build, so rebuild after changing them with `docker compose up --build`.

@@ -5,6 +5,7 @@ import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.OrderEvent;
 import com.midnightmunchies.domain.ord.Restaurant;
+import com.midnightmunchies.domain.ord.RestaurantStatus;
 import jakarta.servlet.http.HttpSession;
 
 import java.math.BigDecimal;
@@ -13,6 +14,8 @@ import java.util.UUID;
 
 public interface OrdService {
     List<Restaurant> browseRestaurants(HttpSession session);
+
+    Restaurant changeRestaurantStatus(UUID restaurantId, RestaurantStatus status, HttpSession session);
 
     List<MenuItem> browseMenu(UUID restaurantId, HttpSession session);
 

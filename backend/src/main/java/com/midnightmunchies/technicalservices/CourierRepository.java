@@ -14,6 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CourierRepository {
     private final Map<UUID, Courier> couriers = new ConcurrentHashMap<>();
 
+    public void clear() {
+        couriers.clear();
+    }
+
     public Optional<Courier> findById(UUID id) {
         return Optional.ofNullable(couriers.get(id));
     }

@@ -1,6 +1,6 @@
 package com.midnightmunchies.domain.ord;
 
-/** The concrete order states. Delivered, Rejected and Cancelled allow no transitions. */
+/** The concrete order states. Refunded, Rejected and Cancelled allow no transitions. */
 final class OrderStates {
 
 	static final OrderState PLACED = new Placed();
@@ -9,6 +9,7 @@ final class OrderStates {
 	static final OrderState READY = new Ready();
 	static final OrderState PICKED_UP = new PickedUp();
 	static final OrderState DELIVERED = new Delivered();
+	static final OrderState REFUNDED = new Refunded();
 	static final OrderState REJECTED = new Rejected();
 	static final OrderState CANCELLED = new Cancelled();
 
@@ -25,7 +26,7 @@ final class OrderStates {
 			case DELIVERED -> DELIVERED;
 			case REJECTED -> REJECTED;
 			case CANCELLED -> CANCELLED;
-			default -> throw new IllegalArgumentException("Orders cannot be restored with status " + status);
+			case REFUNDED -> REFUNDED;
 		};
 	}
 
@@ -113,6 +114,18 @@ final class OrderStates {
 		@Override
 		public OrderStatus status() {
 			return OrderStatus.DELIVERED;
+		}
+
+		@Override
+		public OrderState refund() {
+			return REFUNDED;
+		}
+	}
+
+	private static final class Refunded extends AbstractOrderState {
+		@Override
+		public OrderStatus status() {
+			return OrderStatus.REFUNDED;
 		}
 	}
 
