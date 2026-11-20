@@ -5,7 +5,7 @@ export default function ResetControl({ user, pending, onReset }) {
   if (user?.role !== 'PLATFORM_OPERATOR') return null;
 
   return (
-    <section aria-label="Simulator reset">
+    <section className="simulator-reset" aria-label="Simulator reset">
       {confirming ? (
         <>
           <p>Restore the initial restaurants and menus, clear all orders, deliveries and billing, and remove accounts created since startup?</p>
