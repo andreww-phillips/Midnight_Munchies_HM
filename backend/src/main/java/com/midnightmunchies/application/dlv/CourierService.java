@@ -33,6 +33,15 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+/** 
+ * CourierService:
+ * Manages the courier's lifecycle based on the current order and courier enum states
+ * Rules:
+ * 1. An order can only be offered once its status (AssignmentStatus) is set to READY 
+ * 2. A courier can only be offered an order if its state (CourierState) is set to IDLE
+ * 3. A courier can't go off duty or accept an other order once its state (CourierState) is set to ACTIVE
+ */
+
 @Service
 public class CourierService implements OrderEventListener {
     private final CourierRepository couriers;

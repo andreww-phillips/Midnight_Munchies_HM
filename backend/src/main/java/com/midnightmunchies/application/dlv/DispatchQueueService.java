@@ -38,6 +38,9 @@ public class DispatchQueueService {
         load();
     }
 
+    /**
+     * Makes sure only READY orders are added to the dispatch queue, and persists the updated queue to disk.
+     */
     public synchronized void enqueue(Order order) {
         if (order == null || order.getStatus() != OrderStatus.READY) {
             throw new IllegalArgumentException("Only READY orders can enter the dispatch queue");

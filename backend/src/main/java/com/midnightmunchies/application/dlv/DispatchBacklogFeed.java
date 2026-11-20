@@ -7,6 +7,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * DispatchBacklogFeed:
+ * Dispatch queue adapter that exposes the waiting order IDs to the dashboard.
+ * This is a read-only view of the dispatch queue, which is managed by the DispatchQueueService.
+ */
+
 @Component
 public class DispatchBacklogFeed implements DispatchBacklog {
     private final DispatchQueueService dispatchQueue;

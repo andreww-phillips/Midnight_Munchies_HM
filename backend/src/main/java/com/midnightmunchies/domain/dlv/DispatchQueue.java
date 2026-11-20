@@ -8,6 +8,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * DispatchQueue:
+ * Controls the data structure's accessibility to it's stored order IDs.
+ * enqueue()
+ * poll()
+ * peek()
+ * remove(id)
+ * snapshot()
+ */
+
 public final class DispatchQueue {
     private final ArrayDeque<UUID> orders = new ArrayDeque<>();
     private final LinkedHashSet<UUID> queued = new LinkedHashSet<>();

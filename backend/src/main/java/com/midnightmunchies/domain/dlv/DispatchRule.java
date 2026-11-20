@@ -6,6 +6,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+/**
+ * DispatchRule:
+ * Handles choosing the courier to assign to a ready order.
+ * Steps:
+ * 1. Check for the nearest courier to the restaurant pickup location.
+ * 2. If there are no idle couriers, check for the lowest ID courier.
+ * 3. If there are no idle couriers, return an empty Optional.
+ */
 public final class DispatchRule {
 
     private static final Comparator<Courier> LOWEST_ID =
