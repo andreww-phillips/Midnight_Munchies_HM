@@ -3,6 +3,7 @@ package com.midnightmunchies.application.dlv;
 import com.midnightmunchies.application.ord.AuthorizationException;
 import com.midnightmunchies.application.ord.OrderEventPublisher;
 import com.midnightmunchies.application.ord.OrderTransitions;
+import com.midnightmunchies.application.reg.AccountAuthorization;
 import com.midnightmunchies.application.reg.AuthenticationRequiredException;
 import com.midnightmunchies.domain.dlv.Assignment;
 import com.midnightmunchies.domain.dlv.AssignmentStatus;
@@ -67,7 +68,7 @@ class CourierServiceTests {
         queue = new DispatchQueueService(tempDir.resolve("dispatch-queue.txt"));
         restaurants = new InMemoryRestaurantRepository();
         service = new CourierService(couriers, assignments, orders, restaurants, queue,
-                new OrderTransitions(orders, new OrderEventPublisher()));
+                new OrderTransitions(orders, new OrderEventPublisher()), new AccountAuthorization());
     }
 
     @ParameterizedTest(name = "{0}: missing account is rejected before delivery changes")

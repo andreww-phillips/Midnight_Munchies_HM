@@ -20,7 +20,7 @@ import com.midnightmunchies.domain.reg.UserRole;
 import com.midnightmunchies.technicalservices.AssignmentRepository;
 import com.midnightmunchies.technicalservices.CourierRepository;
 import com.midnightmunchies.application.ord.AuthorizationException;
-import com.midnightmunchies.application.reg.AuthenticationRequiredException;
+import com.midnightmunchies.application.reg.AccountAuthorization;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -50,6 +50,7 @@ public class CourierService implements OrderEventListener {
     private final RestaurantRepository restaurants;
     private final DispatchQueueService dispatchQueue;
     private final OrderTransitions transitions;
+    private final AccountAuthorization authorization;
     private final Clock clock;
     private final DispatchRule dispatchRule = new DispatchRule();
     private final Object dispatchLock = new Object();
@@ -57,19 +58,21 @@ public class CourierService implements OrderEventListener {
     @Autowired
     public CourierService(CourierRepository couriers, AssignmentRepository assignments,
                           OrderRepository orders, RestaurantRepository restaurants,
-                          DispatchQueueService dispatchQueue, OrderTransitions transitions) {
-        this(couriers, assignments, orders, restaurants, dispatchQueue, transitions, Clock.systemUTC());
+                          DispatchQueueService dispatchQueue, OrderTransitions transitions,
+                          AccountAuthorization authorization) {
+        this(couriers, assignments, orders, restaurants, dispatchQueue, transitions, authorization, Clock.systemUTC());
     }
 
     CourierService(CourierRepository couriers, AssignmentRepository assignments, OrderRepository orders,
                    RestaurantRepository restaurants, DispatchQueueService dispatchQueue,
-                   OrderTransitions transitions, Clock clock) {
+                   OrderTransitions transitions, AccountAuthorization authorization, Clock clock) {
         this.couriers = Objects.requireNonNull(couriers, "couriers must not be null");
         this.assignments = Objects.requireNonNull(assignments, "assignments must not be null");
         this.orders = Objects.requireNonNull(orders, "orders must not be null");
         this.restaurants = Objects.requireNonNull(restaurants, "restaurants must not be null");
         this.dispatchQueue = Objects.requireNonNull(dispatchQueue, "dispatchQueue must not be null");
         this.transitions = Objects.requireNonNull(transitions, "transitions must not be null");
+        this.authorization = Objects.requireNonNull(authorization, "authorization must not be null");
         this.clock = Objects.requireNonNull(clock, "clock must not be null");
         restoreQueuedOrders();
     }
@@ -374,26 +377,14 @@ public class CourierService implements OrderEventListener {
     }
 
     private Courier requireCourier(UserAccount account) {
-        UserAccount user = requireAuthenticated(account);
-        if (user.role() != UserRole.COURIER) {
-            throw new AuthorizationException("Only couriers can access courier delivery commands");
-        }
+        UserAccount user = authorization.requireRole(account, UserRole.COURIER,
+                "Only couriers can access courier delivery commands");
         return findOrCreate(userId(user));
     }
 
     private String requireOperator(UserAccount account) {
-        UserAccount user = requireAuthenticated(account);
-        if (user.role() != UserRole.PLATFORM_OPERATOR) {
-            throw new AuthorizationException("Only platform operators can manage deliveries");
-        }
-        return user.id();
-    }
-
-    private UserAccount requireAuthenticated(UserAccount account) {
-        if (account == null) {
-            throw new AuthenticationRequiredException("Authentication is required");
-        }
-        return account;
+        return authorization.requireRole(account, UserRole.PLATFORM_OPERATOR,
+                "Only platform operators can manage deliveries").id();
     }
 
     private UUID userId(UserAccount user) {
