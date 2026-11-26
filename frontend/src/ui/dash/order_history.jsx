@@ -62,75 +62,64 @@ function History({ refreshVersion, user, onSessionExpired }) {
     return () => { active = false; };
   }, [refreshVersion, load]);
 
-  const cancel = async (order) => {
-    if (user.role !== 'CUSTOMER' || order.customerId !== user.id || order.status !== 'PLACED'
-        || loading || cancelBusy.current) return;
-    cancelBusy.current = true;
+  const runOrderCommand = async ({ order, action, busyRef, call, isExpected, mismatchMessage, successMessage }) => {
+    busyRef.current = true;
     setBusyOrder(order.orderId);
     setError('');
     setNotice('');
     try {
-      const result = await api.cancelOrder(order.orderId);
+      const result = await call(order.orderId);
       if (!mounted.current) return;
-      if (result?.id !== order.orderId || result.status !== 'CANCELLED') {
-        throw new Error('The cancellation response does not match this order.');
-      }
-      const message = `Order #${order.orderId.slice(0, 8)} cancelled.`;
+      if (!isExpected(result)) throw new Error(mismatchMessage);
+      const message = successMessage(result);
       setNotice(message);
-      record({ action: 'Cancel order', outcome: 'success', orderId: order.orderId,
+      record({ action, outcome: 'success', orderId: order.orderId,
         restaurantId: order.restaurantId, status: result.status, message });
       await load();
     } catch (commandError) {
       if (!mounted.current) return;
-      record({ action: 'Cancel order', outcome: 'error', orderId: order.orderId,
+      record({ action, outcome: 'error', orderId: order.orderId,
         restaurantId: order.restaurantId, message: commandError.message, httpStatus: commandError.status });
       if (commandError.status === 401) {
         setOrders([]);
         onSessionExpired?.('Your session expired. Please log in again.');
       } else if ([404, 409].includes(commandError.status) || commandError.status == null) {
+        // Reconcile stale state or an uncertain network outcome before another command.
         await load();
       }
       if (mounted.current) setError(commandError.message);
     } finally {
-      cancelBusy.current = false;
+      busyRef.current = false;
       if (mounted.current) setBusyOrder(null);
     }
   };
 
+  const cancel = async (order) => {
+    if (user.role !== 'CUSTOMER' || order.customerId !== user.id || order.status !== 'PLACED'
+        || loading || cancelBusy.current) return;
+    await runOrderCommand({
+      order,
+      action: 'Cancel order',
+      busyRef: cancelBusy,
+      call: (orderId) => api.cancelOrder(orderId),
+      isExpected: (result) => result?.id === order.orderId && result.status === 'CANCELLED',
+      mismatchMessage: 'The cancellation response does not match this order.',
+      successMessage: () => `Order #${order.orderId.slice(0, 8)} cancelled.`
+    });
+  };
+
   const refund = async (order) => {
     if (!operator || loading || refundBusy.current) return;
-    refundBusy.current = true;
-    setBusyOrder(order.orderId);
-    setError('');
-    setNotice('');
-    try {
-      const result = await api.refundOrder(order.orderId);
-      if (!mounted.current) return;
-      if (result?.orderId !== order.orderId || result.status !== 'REFUNDED'
-          || result.refund?.orderId !== order.orderId) {
-        throw new Error('The refund response does not match this order.');
-      }
-      const message = `Order #${order.orderId.slice(0, 8)} refunded ${formatPrice(result.refund.amount)}.`;
-      setNotice(message);
-      record({ action: 'Refund order', outcome: 'success', orderId: order.orderId,
-        restaurantId: order.restaurantId, status: result.status, message });
-      await load();
-    } catch (commandError) {
-      if (!mounted.current) return;
-      record({ action: 'Refund order', outcome: 'error', orderId: order.orderId,
-        restaurantId: order.restaurantId, message: commandError.message, httpStatus: commandError.status });
-      if (commandError.status === 401) {
-        setOrders([]);
-        onSessionExpired?.('Your session expired. Please log in again.');
-      } else if ([404, 409].includes(commandError.status) || commandError.status == null) {
-        // Reconcile stale state or an uncertain network outcome before another refund.
-        await load();
-      }
-      if (mounted.current) setError(commandError.message);
-    } finally {
-      refundBusy.current = false;
-      if (mounted.current) setBusyOrder(null);
-    }
+    await runOrderCommand({
+      order,
+      action: 'Refund order',
+      busyRef: refundBusy,
+      call: (orderId) => api.refundOrder(orderId),
+      isExpected: (result) => result?.orderId === order.orderId && result.status === 'REFUNDED'
+        && result.refund?.orderId === order.orderId,
+      mismatchMessage: 'The refund response does not match this order.',
+      successMessage: (result) => `Order #${order.orderId.slice(0, 8)} refunded ${formatPrice(result.refund.amount)}.`
+    });
   };
 
   return (
