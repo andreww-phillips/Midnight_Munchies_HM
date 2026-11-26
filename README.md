@@ -134,6 +134,47 @@ npm run build
 Backend tests use memory or an isolated local HTTP fixture; they never access
 the shared Supabase database. Frontend tests mock backend API calls.
 
+## Code Metrics
+
+Phase IV measures the code with [Lizard](https://github.com/terryyin/lizard)
+1.26.0. The raw output of every measurement is kept in `docs/metrics/`, one
+folder per snapshot (`phase3`, `phase4-refactored`, `phase4`). Each folder's
+`RUN.md` records the commit measured, the tool version and the exact command.
+
+Requirements: Python 3.9 or newer.
+
+```bash
+pip install lizard==1.26.0
+```
+
+Run these from the repository root. Replace `phase3` with the snapshot being
+measured, and use the same options every time:
+
+```bash
+python -m lizard backend/src/main/java frontend/src -l java -l javascript -l tsx -x "*.test.js" -x "*.test.jsx" -C 15 -Ecognitive -o docs/metrics/phase3/lizard-report.txt
+python -m lizard backend/src/main/java frontend/src -l java -l javascript -l tsx -x "*.test.js" -x "*.test.jsx" -C 15 -Ecognitive --csv -o docs/metrics/phase3/lizard-functions.csv
+python docs/metrics/per_class.py docs/metrics/phase3
+```
+
+- `lizard-report.txt` and `lizard-functions.csv` are the raw tool output.
+- `per-class.csv` is derived from them by `per_class.py` (one row per class or
+  file).
+- `coupling.md` holds the hand-counted coupling of the hotspot classes.
+
+The first command exits with code 1 when Lizard reports warnings (functions
+over the complexity thresholds); that is expected. Only production code is
+measured: tests are excluded. Lizard writes the files itself (`-o`), so the
+commands behave the same in Git Bash and PowerShell.
+
+To measure a tagged snapshot without touching your working copy, check it out
+in a separate worktree, run the commands there, then copy its
+`docs/metrics/<snapshot>/` folder back to your branch and remove the worktree:
+
+```bash
+git worktree add ../mm-phase4 phase4
+git worktree remove ../mm-phase4
+```
+
 ## Running with Docker
 
 Docker runs the backend and the frontend in containers, with no local Java or
