@@ -1,7 +1,11 @@
 package com.midnightmunchies.application.dlv;
 
+import com.midnightmunchies.application.ord.AuthorizationException;
 import com.midnightmunchies.application.ord.OrderEventPublisher;
 import com.midnightmunchies.application.ord.OrderTransitions;
+import com.midnightmunchies.application.reg.AccountAuthorization;
+import com.midnightmunchies.application.reg.AuthenticationRequiredException;
+import com.midnightmunchies.domain.dlv.Assignment;
 import com.midnightmunchies.domain.dlv.AssignmentStatus;
 import com.midnightmunchies.domain.dlv.Courier;
 import com.midnightmunchies.domain.dlv.CourierState;
@@ -22,6 +26,10 @@ import com.midnightmunchies.technicalservices.InMemoryRestaurantRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -30,10 +38,15 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Comparator;
 import java.util.UUID;
+import java.util.Arrays;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CourierServiceTests {
@@ -55,7 +68,188 @@ class CourierServiceTests {
         queue = new DispatchQueueService(tempDir.resolve("dispatch-queue.txt"));
         restaurants = new InMemoryRestaurantRepository();
         service = new CourierService(couriers, assignments, orders, restaurants, queue,
-                new OrderTransitions(orders, new OrderEventPublisher()));
+                new OrderTransitions(orders, new OrderEventPublisher()), new AccountAuthorization());
+    }
+
+    @ParameterizedTest(name = "{0}: missing account is rejected before delivery changes")
+    @MethodSource("accountCommands")
+    void rejectsMissingAccountsWithoutChangingDeliveryState(
+            String name, UserRole requiredRole, String roleMessage, AccountCommand command) throws Exception {
+        AuthenticationRequiredException failure = assertRejectedWithoutChangingDeliveryState(
+                AuthenticationRequiredException.class, null, command);
+
+        assertEquals("Authentication is required", failure.getMessage());
+    }
+
+    @ParameterizedTest(name = "{0}: {1} is refused before parsing the account ID")
+    @MethodSource("wrongRoleCommands")
+    void rejectsWrongRolesBeforeParsingAccountIdOrChangingDeliveryState(
+            String name, UserRole wrongRole, String expectedMessage, AccountCommand command) throws Exception {
+        // A role refusal must win over the malformed ID, as it does before R1.
+        UserAccount wrongAccount = new UserAccount("not-a-uuid", "wrong@example.test", "hash", wrongRole);
+
+        AuthorizationException failure = assertRejectedWithoutChangingDeliveryState(
+                AuthorizationException.class, wrongAccount, command);
+
+        assertEquals(expectedMessage, failure.getMessage());
+    }
+
+    @ParameterizedTest(name = "{0}: malformed courier ID is rejected without delivery changes")
+    @MethodSource("courierCommands")
+    void rejectsMalformedCourierIdsWithoutChangingDeliveryState(
+            String name, AccountCommand command) throws Exception {
+        UserAccount malformedCourier = new UserAccount("not-a-uuid", "courier@example.test", "hash", UserRole.COURIER);
+
+        IllegalArgumentException failure = assertRejectedWithoutChangingDeliveryState(
+                IllegalArgumentException.class, malformedCourier, command);
+
+        assertEquals("Courier account has an invalid ID", failure.getMessage());
+    }
+
+    @Test
+    void firstDashboardAccessCreatesAnOfflineCourierAtTheExistingStartingLocation() {
+        UserAccount account = account(UserRole.COURIER);
+        var expectedPlace = com.midnightmunchies.domain.geo.MontrealServiceArea.placeFor(id(account));
+        assertTrue(couriers.findAll().isEmpty());
+
+        CourierService.CourierDashboard dashboard = service.view(account);
+
+        Courier stored = couriers.findById(id(account)).orElseThrow();
+        assertEquals(1, couriers.findAll().size());
+        assertEquals(CourierState.OFFLINE, dashboard.state());
+        assertFalse(dashboard.onDuty());
+        assertNull(dashboard.assignment());
+        assertEquals(CourierState.OFFLINE, stored.getState());
+        assertTrue(stored.getAssignedOrder().isEmpty());
+        assertEquals(new Location(expectedPlace.latitude(), expectedPlace.longitude()), stored.getLocation());
+        assertTrue(assignments.findActive().isEmpty());
+        assertTrue(queue.view().isEmpty());
+        assertTrue(orders.findAll().isEmpty());
+    }
+
+    @Test
+    void repeatedDashboardAccessPreservesCourierLocationDutyAndExistingOffer() {
+        UserAccount account = account(UserRole.COURIER);
+        service.setDuty(account, true);
+        Courier existing = couriers.findById(id(account)).orElseThrow();
+        Location updatedLocation = new Location(45.51, -73.58);
+        existing.updateLocation(updatedLocation);
+        Order ready = order(true);
+        service.onEvent(event(ready, OrderStatus.PREPARING, OrderStatus.READY));
+        Assignment offered = assignments.findActiveByOrderId(ready.getId()).orElseThrow();
+
+        CourierService.CourierDashboard first = service.view(account);
+        CourierService.CourierDashboard second = service.view(account);
+
+        assertEquals(first, second);
+        assertSame(existing, couriers.findById(id(account)).orElseThrow());
+        assertEquals(1, couriers.findAll().size());
+        assertEquals(updatedLocation, existing.getLocation());
+        assertTrue(second.onDuty());
+        assertEquals(CourierState.IDLE, second.state());
+        assertEquals(offered, second.assignment().assignment());
+        assertEquals(List.of(offered), assignments.findActive());
+        assertEquals(List.of(ready.getId()), queue.view());
+        assertEquals(OrderStatus.READY, ready.getStatus());
+    }
+
+    @Test
+    void operatorDashboardAccessDoesNotCreateACourier() {
+        CourierService.OperatorDeliveriesView dashboard = service.operatorDeliveries(account(UserRole.PLATFORM_OPERATOR));
+
+        assertTrue(dashboard.active().isEmpty());
+        assertTrue(dashboard.queued().isEmpty());
+        assertTrue(couriers.findAll().isEmpty());
+        assertTrue(assignments.findActive().isEmpty());
+        assertTrue(orders.findAll().isEmpty());
+    }
+
+    @Test
+    void operatorAccountIdRemainsAStringDuringDashboardAccessAndReassignment() {
+        UserAccount courier = account(UserRole.COURIER);
+        service.setDuty(courier, true);
+        Order ready = order(true);
+        service.onEvent(event(ready, OrderStatus.PREPARING, OrderStatus.READY));
+        service.accept(courier, ready.getId());
+        UserAccount operator = new UserAccount("operator-id-is-not-a-uuid", "operator@example.test",
+                "hash", UserRole.PLATFORM_OPERATOR);
+
+        assertEquals(1, service.operatorDeliveries(operator).active().size());
+        CourierService.ReassignmentView result = service.reassign(operator, ready.getId());
+
+        assertEquals(operator.id(), result.previous().releasedBy());
+        assertEquals(AssignmentStatus.REASSIGNED, result.previous().status());
+        assertTrue(result.queued());
+        assertNull(result.replacement());
+        assertEquals(CourierState.OFFLINE, couriers.findById(id(courier)).orElseThrow().getState());
+        assertEquals(1, couriers.findAll().size());
+        assertEquals(List.of(ready.getId()), queue.view());
+    }
+
+    private static Stream<Arguments> courierCommands() {
+        return Stream.of(
+                Arguments.of("view", (AccountCommand) (service, account, orderId) -> service.view(account)),
+                Arguments.of("setDuty(true)", (AccountCommand) (service, account, orderId) -> service.setDuty(account, true)),
+                Arguments.of("setDuty(false)", (AccountCommand) (service, account, orderId) -> service.setDuty(account, false)),
+                Arguments.of("accept", (AccountCommand) CourierService::accept),
+                Arguments.of("decline", (AccountCommand) CourierService::decline),
+                Arguments.of("pickUp", (AccountCommand) CourierService::pickUp),
+                Arguments.of("deliver", (AccountCommand) CourierService::deliver));
+    }
+
+    private static Stream<Arguments> accountCommands() {
+        Stream<Arguments> courier = courierCommands().map(arguments -> Arguments.of(
+                arguments.get()[0], UserRole.COURIER, "Only couriers can access courier delivery commands",
+                arguments.get()[1]));
+        Stream<Arguments> operator = Stream.of(
+                Arguments.of("operatorDeliveries", UserRole.PLATFORM_OPERATOR,
+                        "Only platform operators can manage deliveries",
+                        (AccountCommand) (service, account, orderId) -> service.operatorDeliveries(account)),
+                Arguments.of("reassign", UserRole.PLATFORM_OPERATOR,
+                        "Only platform operators can manage deliveries", (AccountCommand) CourierService::reassign));
+        return Stream.concat(courier, operator);
+    }
+
+    private static Stream<Arguments> wrongRoleCommands() {
+        return accountCommands().flatMap(arguments -> Arrays.stream(UserRole.values())
+                .filter(role -> role != arguments.get()[1])
+                .map(role -> Arguments.of(arguments.get()[0], role, arguments.get()[2], arguments.get()[3])));
+    }
+
+    /** Check refusals against populated state so clearing or replacing delivery data cannot pass unnoticed. */
+    private <T extends Throwable> T assertRejectedWithoutChangingDeliveryState(
+            Class<T> failureType, UserAccount rejectedAccount, AccountCommand command) throws Exception {
+        UserAccount owner = account(UserRole.COURIER);
+        service.setDuty(owner, true);
+        Courier existing = couriers.findById(id(owner)).orElseThrow();
+        Location originalLocation = existing.getLocation();
+        Order ready = order(true);
+        service.onEvent(event(ready, OrderStatus.PREPARING, OrderStatus.READY));
+        Assignment offered = assignments.findActiveByOrderId(ready.getId()).orElseThrow();
+        Path queueFile = tempDir.resolve("dispatch-queue.txt");
+        String persistedQueue = Files.readString(queueFile);
+        Executable operation = () -> command.run(service, rejectedAccount, ready.getId());
+
+        T failure = assertThrowsExactly(failureType, operation);
+
+        assertEquals(List.of(existing), couriers.findAll());
+        assertSame(existing, couriers.findById(id(owner)).orElseThrow());
+        assertEquals(originalLocation, existing.getLocation());
+        assertEquals(CourierState.IDLE, existing.getState());
+        assertTrue(existing.isOnDuty());
+        assertTrue(existing.getAssignedOrder().isEmpty());
+        assertEquals(List.of(offered), assignments.findActive());
+        assertEquals(offered, assignments.findById(offered.id()).orElseThrow());
+        assertEquals(List.of(ready.getId()), queue.view());
+        assertEquals(persistedQueue, Files.readString(queueFile));
+        assertEquals(List.of(ready), orders.findAll());
+        assertEquals(OrderStatus.READY, ready.getStatus());
+        return failure;
+    }
+
+    @FunctionalInterface
+    private interface AccountCommand {
+        void run(CourierService service, UserAccount account, UUID orderId);
     }
 
     @Test
