@@ -1,14 +1,10 @@
 package com.midnightmunchies.application.ord;
 
-import com.midnightmunchies.domain.ord.IllegalOrderTransitionException;
-import com.midnightmunchies.domain.ord.DuplicateNameException;
 import com.midnightmunchies.domain.ord.MenuItem;
 import com.midnightmunchies.domain.ord.MenuItemStatus;
 import com.midnightmunchies.domain.ord.Order;
 import com.midnightmunchies.domain.ord.Restaurant;
 import com.midnightmunchies.domain.ord.RestaurantStatus;
-import com.midnightmunchies.technicalservices.CatalogAccessException;
-import com.midnightmunchies.application.reg.AuthenticationRequiredException;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +31,7 @@ import java.util.UUID;
 @CrossOrigin(allowCredentials = "true", origins = "http://localhost:5173")
 public class OrdController {
     private final OrdService authorizedService;
+    private final OrdControllerErrorTranslator errorTranslator = new OrdControllerErrorTranslator();
 
     public OrdController(AuthorizedOrdService authorizedService) {
         this.authorizedService = authorizedService;
@@ -171,35 +168,19 @@ public class OrdController {
     private <T> ResponseEntity<?> execute(AuthorizedOperation<T> operation, HttpStatus successStatus) {
         try {
             return ResponseEntity.status(successStatus).body(operation.run());
-        } catch (CatalogAccessException exception) {
-            return ResponseEntity.status(exception.getStatusCode())
-                    .body(new ErrorResponse(exception.getMessage()));
-        } catch (AuthenticationRequiredException exception) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new ErrorResponse(exception.getMessage()));
-        } catch (AuthorizationException exception) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new ErrorResponse(exception.getMessage()));
-        } catch (MenuItemNotFoundException | OrderNotFoundException exception) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(new ErrorResponse(exception.getMessage()));
-        } catch (DuplicateNameException | EmptyPreparationQueueException | IllegalOrderTransitionException exception) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(new ErrorResponse(exception.getMessage()));
-        } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest()
-                    .body(new ErrorResponse(exception.getMessage()));
+        } catch (RuntimeException exception) {
+            return errorTranslator.translate(exception);
         }
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> invalidRequestBody() {
-        return ResponseEntity.badRequest().body(new ErrorResponse("Request body is missing or malformed"));
+        return errorTranslator.invalidRequestBody();
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> invalidIdentifier() {
-        return ResponseEntity.badRequest().body(new ErrorResponse("Restaurant, menu item and order IDs must be valid UUIDs"));
+        return errorTranslator.invalidIdentifier();
     }
 
     @FunctionalInterface
