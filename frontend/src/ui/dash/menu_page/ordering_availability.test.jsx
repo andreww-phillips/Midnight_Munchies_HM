@@ -6,7 +6,7 @@ import { api } from '../../../api';
 import RestaurantList from '../restaurant_library/restaurant_library';
 
 vi.mock('../../../api', () => ({ api: {
-  restaurants: vi.fn(), menu: vi.fn(), orderHistory: vi.fn(), placeOrder: vi.fn()
+  restaurants: vi.fn(), menu: vi.fn(), orderHistory: vi.fn(), placeOrder: vi.fn(), restaurantReviews: vi.fn()
 } }));
 
 const restaurant = { id: 'r1', name: 'Diner', status: 'OPEN' };
@@ -34,6 +34,7 @@ beforeEach(() => {
   api.restaurants.mockResolvedValue([restaurant]);
   api.menu.mockResolvedValue([item]);
   api.orderHistory.mockResolvedValue([]);
+  api.restaurantReviews.mockResolvedValue({ averageRating: null, reviewCount: 0, reviews: [] });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);

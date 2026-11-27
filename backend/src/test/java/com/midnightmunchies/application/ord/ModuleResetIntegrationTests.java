@@ -11,6 +11,7 @@ import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.technicalservices.AssignmentRepository;
 import com.midnightmunchies.technicalservices.CourierRepository;
 import com.midnightmunchies.technicalservices.LedgerRepository;
+import com.midnightmunchies.technicalservices.ReviewRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +45,7 @@ class ModuleResetIntegrationTests {
     @Autowired private OrderRepository orders;
     @Autowired private OrderEventLog events;
     @Autowired private LedgerRepository ledger;
+    @Autowired private ReviewRepository reviews;
     @Autowired private AssignmentRepository assignments;
     @Autowired private CourierRepository couriers;
     @Autowired private DispatchQueueService dispatch;
@@ -157,6 +159,7 @@ class ModuleResetIntegrationTests {
         assertTrue(events.findAll().isEmpty());
         assertTrue(ledger.findAll().isEmpty());
         assertTrue(ledger.findAllRefunds().isEmpty());
+        assertTrue(reviews.findByTarget(com.midnightmunchies.domain.rev.ReviewTarget.RESTAURANT, DINER).isEmpty());
         assertTrue(assignments.findActive().isEmpty());
         assertTrue(dispatch.view().isEmpty());
         assertTrue(dispatch.restoreOrders().isEmpty());

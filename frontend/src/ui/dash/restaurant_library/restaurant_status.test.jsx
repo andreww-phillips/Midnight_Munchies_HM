@@ -9,7 +9,7 @@ import OutputConsole from '../output_console/output_console';
 
 vi.mock('../../../api', () => ({ api: {
   restaurants: vi.fn(), changeRestaurantStatus: vi.fn(), orderHistory: vi.fn(),
-  orders: vi.fn(), preparationQueue: vi.fn(), menu: vi.fn()
+  orders: vi.fn(), preparationQueue: vi.fn(), menu: vi.fn(), restaurantReviews: vi.fn()
 } }));
 
 const owner = { id: 'staff-1', role: 'RESTAURANT_STAFF' };
@@ -40,6 +40,7 @@ beforeEach(() => {
   api.orders.mockResolvedValue([]);
   api.preparationQueue.mockResolvedValue([]);
   api.menu.mockResolvedValue([]);
+  api.restaurantReviews.mockResolvedValue({ averageRating: null, reviewCount: 0, reviews: [] });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -67,6 +68,19 @@ it('allows staff to pause only their own restaurant, logs success, and keeps pre
   await click(button('Manage orders'));
   expect(container.querySelector('.restaurant-dashboard')).not.toBeNull();
   expect(api.preparationQueue).toHaveBeenCalledWith(diner.id);
+});
+
+it('shows each restaurant rating and review count in the dashboard list', async () => {
+  api.restaurantReviews.mockImplementation(async (id) => ({
+    targetId: id, averageRating: id === diner.id ? 3.5 : null,
+    reviewCount: id === diner.id ? 2 : 0, reviews: []
+  }));
+  await render();
+
+  expect(cards()[0].textContent).toContain('Restaurant reviews');
+  expect(cards()[0].textContent).toContain('3.5 / 5');
+  expect(cards()[0].textContent).toContain('2 reviews');
+  expect(cards()[0].querySelector('.review-list')).toBeNull();
 });
 
 it.each(['CUSTOMER', 'COURIER'])('shows no status commands to %s', async (role) => {

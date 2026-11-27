@@ -9,7 +9,8 @@ import { CommandLogProvider } from './output_console/command_log_provider';
 import OutputConsole from './output_console/output_console';
 
 vi.mock('../../api', () => ({ api: {
-  orderHistory: vi.fn(), refundOrder: vi.fn(), cancelOrder: vi.fn(), orderSummary: vi.fn(), orderEvents: vi.fn(), restaurants: vi.fn()
+  orderHistory: vi.fn(), refundOrder: vi.fn(), cancelOrder: vi.fn(), orderSummary: vi.fn(), orderEvents: vi.fn(),
+  restaurants: vi.fn(), orderReviews: vi.fn(), restaurantReviews: vi.fn()
 } }));
 
 const customer = { id: 'customer-1', role: 'CUSTOMER' };
@@ -32,6 +33,8 @@ beforeEach(() => {
   api.orderSummary.mockResolvedValue(summary);
   api.orderEvents.mockResolvedValue([]);
   api.restaurants.mockResolvedValue([]);
+  api.orderReviews.mockResolvedValue({ eligible: false });
+  api.restaurantReviews.mockResolvedValue({ averageRating: null, reviewCount: 0, reviews: [] });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);

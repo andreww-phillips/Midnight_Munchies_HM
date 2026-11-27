@@ -4,6 +4,7 @@ import { formatPrice } from './menu_page/menu_format';
 import OrderEventHistory from './order_event_history';
 import OrderSummaryPage from './order_summary_page';
 import { useCommandLog } from './output_console/command_log';
+import { OrderReviewPanel } from './reviews';
 
 import './order_history.css';
 
@@ -159,7 +160,12 @@ function History({ refreshVersion, user, onSessionExpired }) {
           {user.role !== 'COURIER' && <OrderEventHistory orderId={order.orderId}
             restaurantId={order.restaurantId} disabled={loading || Boolean(busyOrder)} />}
           {canViewSummary && ['DELIVERED', 'REFUNDED'].includes(order.status) && (
-            <OrderSummaryPage orderId={order.orderId} refreshVersion={revision} />
+            <>
+              <OrderSummaryPage orderId={order.orderId} refreshVersion={revision} />
+              {user.role === 'CUSTOMER' && order.customerId === user.id && (
+                <OrderReviewPanel orderId={order.orderId} onSessionExpired={onSessionExpired} />
+              )}
+            </>
           )}
           {refunds.length > 0 && <section className="history-refunds" aria-label={`Refund ledger for order ${order.orderId}`}>
             <h5>Refund ledger</h5>

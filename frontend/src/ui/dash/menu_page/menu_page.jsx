@@ -4,8 +4,11 @@ import { formatPrice } from "./menu_format";
 import { dishImageUrl } from "../storage";
 import "./menu_page.css";
 import { useCommandLog } from "../output_console/command_log";
+import { ReviewSummary } from "../reviews";
 
-export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced, availabilityError = '' }) {
+export default function RestaurantMenu({
+  restaurant, user, onBack, onOrderPlaced, onSessionExpired, availabilityError = ''
+}) {
   const { record } = useCommandLog();
   const commandBusy = useRef(false);
   const [menuItems, setMenuItems] = useState([]);
@@ -198,6 +201,7 @@ export default function RestaurantMenu({ restaurant, user, onBack, onOrderPlaced
             }
           }}>Refresh menu</button>
         </div>
+        <ReviewSummary target="RESTAURANT" targetId={restaurant.id} onSessionExpired={onSessionExpired} />
       </div>
       {error && <p className="error-message" role="alert">{error}</p>}
       {canOrder && (availabilityError || menuAvailabilityError) && (

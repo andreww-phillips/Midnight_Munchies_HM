@@ -79,6 +79,18 @@ describe("restaurant order API", () => {
     expect(options.body === undefined ? undefined : JSON.parse(options.body)).toEqual(body);
   });
 
+  it("submits a restaurant or courier review with the active customer session", async () => {
+    const saved = { orderId: "order-1", targetId: "courier-1", rating: 5, text: "Great delivery." };
+    fetch.mockResolvedValue(new Response(JSON.stringify(saved), { status: 201 }));
+
+    await expect(api.submitReview("order-1", "COURIER", 5, "Great delivery.")).resolves.toEqual(saved);
+
+    const [url, options] = fetch.mock.calls[0];
+    expect(new URL(url).pathname).toBe("/api/reviews/orders/order-1");
+    expect(options).toMatchObject({ method: "POST", credentials: "include" });
+    expect(JSON.parse(options.body)).toEqual({ target: "COURIER", rating: 5, text: "Great delivery." });
+  });
+
   describe("courier offer API", () => {
     beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
     afterEach(() => vi.unstubAllGlobals());
