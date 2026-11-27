@@ -93,6 +93,18 @@ it('shows restaurant reviews below staff order history, grouped by restaurant', 
   expect(api.restaurantReviews).toHaveBeenCalledTimes(2);
 });
 
+it('loads restaurant names when restaurant staff open order history directly', async () => {
+  api.orderHistory.mockResolvedValue([order]);
+  api.restaurants.mockResolvedValue([{ id: order.restaurantId, name: 'Diner One' }]);
+  const staff = { id: 'staff-1', role: 'RESTAURANT_STAFF' };
+
+  await render(staff);
+
+  expect(api.restaurants).toHaveBeenCalledTimes(1);
+  expect(container.textContent).toContain('Diner One reviews');
+  expect(container.textContent).not.toContain('Restaurant restaurant-1 reviews');
+});
+
 it.each(['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'PICKED_UP', 'REJECTED', 'CANCELLED'])
   ('does not request a summary for an order in state %s', async (status) => {
     api.orderHistory.mockResolvedValue([{ ...order, status }]);

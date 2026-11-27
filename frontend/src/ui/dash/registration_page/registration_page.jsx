@@ -276,7 +276,7 @@ function RegistrationScreen() {
                   <OperatorDashboard key={`${user.id}:operator`} onSessionExpired={handleViewSessionExpired} />
                 )}
                 {user.role === "COURIER"
-                  ? <CourierDashboard key={`${user.id}:${user.role}`} onSessionExpired={handleViewSessionExpired} />
+                  ? <CourierDashboard key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleViewSessionExpired} />
                   : <RestaurantList key={`${user.id}:${user.role}`} user={user} onSessionExpired={handleViewSessionExpired} initialOpen={openRequest} />}
               </>
             )}

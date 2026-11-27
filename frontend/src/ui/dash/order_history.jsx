@@ -15,9 +15,11 @@ const titles = {
   PLATFORM_OPERATOR: 'All orders and billing'
 };
 
-function History({ refreshVersion, user, onSessionExpired, restaurants = [] }) {
+function History({ refreshVersion, user, onSessionExpired, restaurants }) {
   const { record } = useCommandLog();
   const [orders, setOrders] = useState([]);
+  const [loadedRestaurants, setLoadedRestaurants] = useState([]);
+  const [restaurantLookupError, setRestaurantLookupError] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
@@ -29,6 +31,7 @@ function History({ refreshVersion, user, onSessionExpired, restaurants = [] }) {
   const cancelBusy = useRef(false);
   const canViewSummary = ['CUSTOMER', 'PLATFORM_OPERATOR'].includes(user.role);
   const operator = user.role === 'PLATFORM_OPERATOR';
+  const restaurantCatalog = restaurants ?? loadedRestaurants;
   const reviewedRestaurantIds = user.role === 'RESTAURANT_STAFF'
     ? [...new Set(orders.filter((order) => ['DELIVERED', 'REFUNDED'].includes(order.status))
       .map((order) => order.restaurantId))]
@@ -37,6 +40,25 @@ function History({ refreshVersion, user, onSessionExpired, restaurants = [] }) {
     mounted.current = true;
     return () => { mounted.current = false; requestVersion.current += 1; };
   }, []);
+
+  useEffect(() => {
+    if (user.role !== 'RESTAURANT_STAFF' || restaurants !== undefined) return undefined;
+    let active = true;
+    api.restaurants()
+      .then((items) => {
+        if (!active) return;
+        setLoadedRestaurants(items);
+        setRestaurantLookupError('');
+      })
+      .catch((loadError) => {
+        if (!active) return;
+        setRestaurantLookupError(loadError.message);
+        record({ action: 'Load restaurant names', outcome: 'error',
+          message: loadError.message, httpStatus: loadError.status });
+        if (loadError.status === 401) onSessionExpired?.('Your session expired. Please log in again.');
+      });
+    return () => { active = false; };
+  }, [user.role, restaurants, record, onSessionExpired]);
 
   const load = useCallback(async (logSuccess = true) => {
     const version = ++requestVersion.current;
@@ -193,8 +215,9 @@ function History({ refreshVersion, user, onSessionExpired, restaurants = [] }) {
       {reviewedRestaurantIds.length > 0 && (
         <section className="restaurant-order-reviews" aria-label="Reviews for your restaurants">
           <h3>Restaurant reviews</h3>
+          {restaurantLookupError && <p role="alert">Unable to load restaurant names: {restaurantLookupError}</p>}
           {reviewedRestaurantIds.map((restaurantId) => {
-            const name = restaurants.find((restaurant) => restaurant.id === restaurantId)?.name;
+            const name = restaurantCatalog.find((restaurant) => restaurant.id === restaurantId)?.name;
             return <ReviewSummary key={restaurantId} target="RESTAURANT" targetId={restaurantId}
               heading={name ? `${name} reviews` : `Restaurant ${restaurantId.slice(0, 8)} reviews`}
               onSessionExpired={onSessionExpired} />;
