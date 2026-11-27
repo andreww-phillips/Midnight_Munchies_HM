@@ -36,7 +36,11 @@ export function ReviewSummary({
   if (error) return <p className="review-error" role="alert">{error}</p>;
   if (!summary) return <p className="muted" role="status">Loading {title.toLowerCase()} reviews...</p>;
 
-  const visibleReviews = compact ? [] : showAll ? summary.reviews : summary.reviews.slice(0, 1);
+  const visibleReviews = showAll ? summary.reviews : summary.reviews.slice(0, 1);
+  const showReviewList = !compact || showAll;
+  const showToggle = summary.reviewCount > (compact ? 0 : 1);
+  const toggleLabel = showAll ? (compact ? 'Hide reviews' : 'Show latest review') : `View all reviews (${summary.reviewCount})`;
+
   return (
     <section className={`review-summary${compact ? ' review-summary-compact' : ''}`} aria-label={sectionHeading}>
       <h3>{sectionHeading}</h3>
@@ -48,21 +52,21 @@ export function ReviewSummary({
             <span aria-label={`${summary.averageRating} out of 5 stars`}>★ {Number(summary.averageRating).toFixed(1)} / 5</span>
             {' '}· {summary.reviewCount} {summary.reviewCount === 1 ? 'review' : 'reviews'}
           </p>
-          {!compact && <>
+          {showReviewList && (
             <ul className="review-list">
               {visibleReviews.map((review, index) => (
-              <li key={`${review.createdAt}-${index}`}>
-                <p aria-label={`${review.rating} out of 5 stars`}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
-                <p>{review.text}</p>
-                <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString()}</time>
-              </li>
+                <li key={`${review.createdAt}-${index}`}>
+                  <p aria-label={`${review.rating} out of 5 stars`}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
+                  <p>{review.text}</p>
+                  <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString()}</time>
+                </li>
               ))}
             </ul>
-            {summary.reviewCount > 1 && <button className="link-button" type="button"
-              aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>
-              {showAll ? 'Show latest review' : `View all reviews (${summary.reviewCount})`}
-            </button>}
-          </>}
+          )}
+          {showToggle && <button className="link-button" type="button"
+            aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>
+            {toggleLabel}
+          </button>}
         </>
       )}
     </section>
