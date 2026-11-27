@@ -166,8 +166,8 @@ export function OrderReviewPanel({ orderId, onSessionExpired }) {
         onSubmitted={() => setRefresh((value) => value + 1)} onSessionExpired={onSessionExpired} />
       <ReviewEditor orderId={orderId} target="COURIER" review={status.courierReview}
         onSubmitted={() => setRefresh((value) => value + 1)} onSessionExpired={onSessionExpired} />
-      <ReviewSummary target="COURIER" targetId={status.courierId} onSessionExpired={onSessionExpired}
-        reloadKey={refresh} />
+      {/* <ReviewSummary target="COURIER" targetId={status.courierId} onSessionExpired={onSessionExpired}
+        reloadKey={refresh} /> */}
     </section>
   );
 }
