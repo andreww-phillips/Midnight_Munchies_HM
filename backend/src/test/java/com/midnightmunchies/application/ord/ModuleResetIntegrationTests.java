@@ -92,7 +92,7 @@ class ModuleResetIntegrationTests {
         assertEquals(List.of(UUID.fromString(queuedDelivery)), dispatch.view());
         assertEquals(1, orders.findPreparationQueue(DINER).size());
         assertEquals(1, ledger.findAllRefunds().size());
-        assertEquals(1, reviews.findByTarget(com.midnightmunchies.domain.rev.ReviewTarget.RESTAURANT, DINER).size());
+        assertEquals(1, reviews.findByTarget(com.midnightmunchies.domain.rvw.ReviewTarget.RESTAURANT, DINER).size());
         assertNotNull(ledger.findByOrderId(UUID.fromString(delivered)).orElseThrow().charge());
         assertFalse(events.findAll().isEmpty());
 
@@ -163,7 +163,7 @@ class ModuleResetIntegrationTests {
         assertTrue(events.findAll().isEmpty());
         assertTrue(ledger.findAll().isEmpty());
         assertTrue(ledger.findAllRefunds().isEmpty());
-        assertTrue(reviews.findByTarget(com.midnightmunchies.domain.rev.ReviewTarget.RESTAURANT, DINER).isEmpty());
+        assertTrue(reviews.findByTarget(com.midnightmunchies.domain.rvw.ReviewTarget.RESTAURANT, DINER).isEmpty());
         assertTrue(assignments.findActive().isEmpty());
         assertTrue(dispatch.view().isEmpty());
         assertTrue(dispatch.restoreOrders().isEmpty());

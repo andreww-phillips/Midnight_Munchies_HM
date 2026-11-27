@@ -1,8 +1,9 @@
 package com.midnightmunchies.technicalservices;
 
-import com.midnightmunchies.domain.rev.DeliveryReview;
-import com.midnightmunchies.domain.rev.ReviewTarget;
 import org.springframework.stereotype.Repository;
+
+import com.midnightmunchies.domain.rvw.DeliveryReview;
+import com.midnightmunchies.domain.rvw.ReviewTarget;
 
 import java.util.Comparator;
 import java.util.List;

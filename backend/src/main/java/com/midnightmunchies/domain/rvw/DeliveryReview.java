@@ -1,4 +1,4 @@
-package com.midnightmunchies.domain.rev;
+package com.midnightmunchies.domain.rvw;
 
 import java.time.Instant;
 import java.util.Objects;

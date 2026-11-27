@@ -4,7 +4,8 @@ import com.midnightmunchies.application.ord.AuthorizationException;
 import com.midnightmunchies.application.ord.OrderNotFoundException;
 import com.midnightmunchies.application.reg.AuthenticationRequiredException;
 import com.midnightmunchies.domain.reg.UserAccount;
-import com.midnightmunchies.domain.rev.ReviewTarget;
+import com.midnightmunchies.domain.rvw.ReviewTarget;
+
 import jakarta.servlet.http.HttpSession;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
