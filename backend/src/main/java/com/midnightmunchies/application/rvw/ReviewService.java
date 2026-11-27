@@ -1,4 +1,4 @@
-package com.midnightmunchies.application.rev;
+package com.midnightmunchies.application.rvw;
 
 import com.midnightmunchies.application.ord.AuthorizationException;
 import com.midnightmunchies.application.ord.OrderNotFoundException;
