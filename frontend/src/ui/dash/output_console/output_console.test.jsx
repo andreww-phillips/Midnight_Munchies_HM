@@ -68,6 +68,7 @@ beforeEach(() => {
   api.orderHistory.mockResolvedValue([]);
   api.preparationQueue.mockResolvedValue([]);
   api.menu.mockResolvedValue([item]);
+  api.restaurantReviews.mockResolvedValue({ averageRating: null, reviewCount: 0, reviews: [] });
   api.orderEvents.mockResolvedValue([]);
   container = document.createElement('div');
   document.body.append(container);

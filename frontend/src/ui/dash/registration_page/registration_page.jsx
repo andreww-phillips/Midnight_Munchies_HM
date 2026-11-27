@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import RestaurantList from "../restaurant_library/restaurant_library.jsx";
-import CourierDashboard from "../courier_dashboard_page.jsx";
-import OperatorDashboard from "../operator_dashboard_page.jsx";
+import CourierDashboard from "../courier_dashboard/courier_dashboard_page.jsx";
+import OperatorDashboard from "../operator_dashboard/operator_dashboard_page.jsx";
 import MapPage from "../map_page/map_page.jsx";
 import OrderHistory from "../order_history.jsx";
 import { api } from "../../../api";

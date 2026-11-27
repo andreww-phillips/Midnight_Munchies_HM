@@ -10,7 +10,7 @@ import { CommandLogContext } from './output_console/command_log';
 
 vi.mock('../../api', () => ({ api: {
   orderHistory: vi.fn(), refundOrder: vi.fn(), cancelOrder: vi.fn(), orderSummary: vi.fn(), orderEvents: vi.fn(),
-  orderReviews: vi.fn()
+  orderReviews: vi.fn(), restaurantReviews: vi.fn()
 } }));
 
 const customer = { id: 'customer-1', role: 'CUSTOMER' };
@@ -49,6 +49,7 @@ beforeEach(() => {
   api.orderSummary.mockResolvedValue(summary);
   api.orderEvents.mockResolvedValue([]);
   api.orderReviews.mockResolvedValue({ eligible: false });
+  api.restaurantReviews.mockResolvedValue({ averageRating: null, reviewCount: 0, reviews: [] });
   record = vi.fn();
   unmounted = false;
   container = document.createElement('div');

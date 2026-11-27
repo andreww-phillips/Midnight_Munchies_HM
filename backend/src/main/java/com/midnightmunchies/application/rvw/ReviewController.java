@@ -40,8 +40,12 @@ public class ReviewController {
             @RequestBody ReviewRequest request,
             HttpSession session
     ) {
-        return execute(() -> reviews.submit(orderId, request.target(), request.rating(), request.text(),
-                account(session)), HttpStatus.CREATED);
+        return execute(() -> {
+            if (request == null) {
+                throw new IllegalArgumentException("Review request is required");
+            }
+            return reviews.submit(orderId, request.target(), request.rating(), request.text(), account(session));
+        }, HttpStatus.CREATED);
     }
 
     @GetMapping("/restaurants/{restaurantId}")

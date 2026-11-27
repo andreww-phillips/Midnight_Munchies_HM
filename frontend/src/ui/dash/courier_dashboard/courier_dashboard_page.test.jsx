@@ -2,10 +2,10 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { api } from '../../api';
+import { api } from '../../../api';
 import CourierDashboard from './courier_dashboard_page';
-import { CommandLogProvider } from './output_console/command_log_provider';
-import OutputConsole from './output_console/output_console';
+import { CommandLogProvider } from '../output_console/command_log_provider';
+import OutputConsole from '../output_console/output_console';
 
 vi.mock('../../api', () => ({ api: {
   courierDashboard: vi.fn(), setCourierDuty: vi.fn(), acceptDelivery: vi.fn(), declineDelivery: vi.fn(),

@@ -4,7 +4,7 @@ import { formatPrice } from './menu_page/menu_format';
 import OrderEventHistory from './order_event_history';
 import OrderSummaryPage from './order_summary_page';
 import { useCommandLog } from './output_console/command_log';
-import { OrderReviewPanel } from './reviews';
+import { OrderReviewPanel, ReviewSummary } from './reviews';
 
 import './order_history.css';
 
@@ -15,7 +15,7 @@ const titles = {
   PLATFORM_OPERATOR: 'All orders and billing'
 };
 
-function History({ refreshVersion, user, onSessionExpired }) {
+function History({ refreshVersion, user, onSessionExpired, restaurants = [] }) {
   const { record } = useCommandLog();
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState('');
@@ -29,6 +29,10 @@ function History({ refreshVersion, user, onSessionExpired }) {
   const cancelBusy = useRef(false);
   const canViewSummary = ['CUSTOMER', 'PLATFORM_OPERATOR'].includes(user.role);
   const operator = user.role === 'PLATFORM_OPERATOR';
+  const reviewedRestaurantIds = user.role === 'RESTAURANT_STAFF'
+    ? [...new Set(orders.filter((order) => ['DELIVERED', 'REFUNDED'].includes(order.status))
+      .map((order) => order.restaurantId))]
+    : [];
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; requestVersion.current += 1; };
@@ -186,6 +190,17 @@ function History({ refreshVersion, user, onSessionExpired }) {
           </button>}
         </article>;
       })}
+      {reviewedRestaurantIds.length > 0 && (
+        <section className="restaurant-order-reviews" aria-label="Reviews for your restaurants">
+          <h3>Restaurant reviews</h3>
+          {reviewedRestaurantIds.map((restaurantId) => {
+            const name = restaurants.find((restaurant) => restaurant.id === restaurantId)?.name;
+            return <ReviewSummary key={restaurantId} target="RESTAURANT" targetId={restaurantId}
+              heading={name ? `${name} reviews` : `Restaurant ${restaurantId.slice(0, 8)} reviews`}
+              onSessionExpired={onSessionExpired} />;
+          })}
+        </section>
+      )}
     </section>
   );
 }

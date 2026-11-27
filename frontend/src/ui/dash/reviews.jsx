@@ -7,11 +7,14 @@ const targets = {
   COURIER: { title: 'Courier', loadSummary: (id) => api.courierReviews(id) }
 };
 
-export function ReviewSummary({ target, targetId, onSessionExpired, compact = false }) {
+export function ReviewSummary({
+  target, targetId, onSessionExpired, compact = false, reloadKey = 0, heading
+}) {
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState('');
   const [showAll, setShowAll] = useState(false);
   const title = targets[target]?.title;
+  const sectionHeading = heading ?? `${title} reviews`;
 
   useEffect(() => {
     if (!title || !targetId) return undefined;
@@ -27,7 +30,7 @@ export function ReviewSummary({ target, targetId, onSessionExpired, compact = fa
         if (loadError.status === 401) onSessionExpired?.(loadError.message);
       });
     return () => { active = false; };
-  }, [target, targetId, title, onSessionExpired]);
+  }, [target, targetId, title, onSessionExpired, reloadKey]);
 
   if (!title || !targetId) return null;
   if (error) return <p className="review-error" role="alert">{error}</p>;
@@ -35,8 +38,8 @@ export function ReviewSummary({ target, targetId, onSessionExpired, compact = fa
 
   const visibleReviews = compact ? [] : showAll ? summary.reviews : summary.reviews.slice(0, 1);
   return (
-    <section className={`review-summary${compact ? ' review-summary-compact' : ''}`} aria-label={`${title} reviews`}>
-      <h3>{title} reviews</h3>
+    <section className={`review-summary${compact ? ' review-summary-compact' : ''}`} aria-label={sectionHeading}>
+      <h3>{sectionHeading}</h3>
       {summary.reviewCount === 0 ? (
         <p className="muted">No reviews yet.</p>
       ) : (
@@ -47,8 +50,8 @@ export function ReviewSummary({ target, targetId, onSessionExpired, compact = fa
           </p>
           {!compact && <>
             <ul className="review-list">
-              {visibleReviews.map((review) => (
-              <li key={`${review.orderId}-${review.targetId}`}>
+              {visibleReviews.map((review, index) => (
+              <li key={`${review.createdAt}-${index}`}>
                 <p aria-label={`${review.rating} out of 5 stars`}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
                 <p>{review.text}</p>
                 <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString()}</time>
@@ -159,7 +162,8 @@ export function OrderReviewPanel({ orderId, onSessionExpired }) {
         onSubmitted={() => setRefresh((value) => value + 1)} onSessionExpired={onSessionExpired} />
       <ReviewEditor orderId={orderId} target="COURIER" review={status.courierReview}
         onSubmitted={() => setRefresh((value) => value + 1)} onSessionExpired={onSessionExpired} />
-      <ReviewSummary target="COURIER" targetId={status.courierId} onSessionExpired={onSessionExpired} />
+      <ReviewSummary target="COURIER" targetId={status.courierId} onSessionExpired={onSessionExpired}
+        reloadKey={refresh} />
     </section>
   );
 }

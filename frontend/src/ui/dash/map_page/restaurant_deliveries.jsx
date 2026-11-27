@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../../api';
 import { useCommandLog } from '../output_console/command_log';
-import { shortId } from '../operator_format';
+import { shortId } from '../operator_dashboard/operator_format';
 
 export default function RestaurantDeliveries({ orderIds, refreshKey, onSessionExpired }) {
   const { record } = useCommandLog();

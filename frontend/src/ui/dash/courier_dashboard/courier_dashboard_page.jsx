@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../../api';
-import { formatPrice } from './menu_page/menu_format';
-import { useCommandLog } from './output_console/command_log';
+import { api } from '../../../api';
+import { formatPrice } from '../menu_page/menu_format';
+import { useCommandLog } from '../output_console/command_log';
 import './courier_dashboard_page.css';
 
 function availableActions(dashboard) {

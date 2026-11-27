@@ -4,6 +4,7 @@ import { formatPrice } from '../menu_page/menu_format';
 import './restaurant_dashboard.css';
 import { useCommandLog } from '../output_console/command_log';
 import OrderEventHistory from '../order_event_history';
+import { ReviewSummary } from '../reviews';
 
 function OrderCard({ order, disabled = false, onCommand }) {
   const { record } = useCommandLog();
@@ -223,6 +224,8 @@ function RestaurantOrders({ restaurant, onSessionExpired }) {
         <OrderGroup title="Other orders" orders={data.orders.filter((order) =>
           !['PLACED', 'ACCEPTED', 'PREPARING', 'READY'].includes(order.status))}
           emptyMessage="No other orders." disabled={busy} />
+        <ReviewSummary target="RESTAURANT" targetId={restaurant.id} onSessionExpired={onSessionExpired}
+          reloadKey={refresh} />
       </>}
     </div>
   );

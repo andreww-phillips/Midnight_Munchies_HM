@@ -144,9 +144,9 @@ public class ReviewService {
                                     ReviewView restaurantReview, ReviewView courierReview) {
     }
 
-    public record ReviewView(UUID orderId, UUID targetId, int rating, String text, Instant createdAt) {
+    public record ReviewView(UUID targetId, int rating, String text, Instant createdAt) {
         private static ReviewView from(DeliveryReview review) {
-            return new ReviewView(review.orderId(), review.targetId(), review.rating(), review.text(), review.createdAt());
+            return new ReviewView(review.targetId(), review.rating(), review.text(), review.createdAt());
         }
     }
 
