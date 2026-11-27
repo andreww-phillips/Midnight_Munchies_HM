@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../../api';
-import { useCommandLog } from './output_console/command_log';
+import { api } from '../../../api';
+import { useCommandLog } from '../output_console/command_log';
 import { formatWaiting, shortId } from './operator_format';
 import './operator_dashboard_page.css';
 

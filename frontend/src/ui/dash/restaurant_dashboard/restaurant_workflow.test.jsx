@@ -8,7 +8,7 @@ import { api } from '../../../api';
 vi.mock('../../../api', () => ({ api: {
   currentUser: vi.fn(), login: vi.fn(), logout: vi.fn(), restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn(),
   preparationQueue: vi.fn(), acceptOrder: vi.fn(), rejectOrder: vi.fn(), startNextPreparation: vi.fn(),
-  markOrderReady: vi.fn(), orderEvents: vi.fn()
+  markOrderReady: vi.fn(), orderEvents: vi.fn(), restaurantReviews: vi.fn()
 } }));
 
 const staff = { id: 'staff-1', role: 'RESTAURANT_STAFF', username: 'staff@example.com' };
@@ -51,6 +51,7 @@ beforeEach(async () => {
   api.restaurants.mockResolvedValue([restaurant, { id: 'foreign-restaurant', name: 'Other Diner', ownerId: 'other-staff' }]);
   snapshot([]);
   api.orderHistory.mockResolvedValue([]);
+  api.restaurantReviews.mockResolvedValue({ averageRating: null, reviewCount: 0, reviews: [] });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);

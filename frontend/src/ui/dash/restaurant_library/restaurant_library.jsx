@@ -4,6 +4,7 @@ import { storageUrl } from '../storage';
 import RestaurantMenu from '../menu_page/menu_page.jsx';
 import OrderHistory from '../order_history.jsx';
 import RestaurantDashboard from '../restaurant_dashboard/restaurant_dashboard.jsx';
+import { ReviewSummary } from '../reviews';
 import { useCommandLog } from '../output_console/command_log';
 import './restaurant_library.css';
 
@@ -132,6 +133,7 @@ export default function RestaurantList({ user, onSessionExpired, initialOpen = n
             key={selectedRestaurant.id}
             restaurant={selectedRestaurant}
             user={user}
+            onSessionExpired={onSessionExpired}
             availabilityError={availabilityError}
             onBack={() => setSelectedRestaurant(null)}
             onOrderPlaced={() => setOrdersVersion((version) => version + 1)}
@@ -152,6 +154,8 @@ export default function RestaurantList({ user, onSessionExpired, initialOpen = n
                     {logo && <img src={logo} alt={`${restaurant.name} logo`} width={120} height={120} />}
                     <h4>{restaurant.name}</h4>
                     <p className="status-pill">Status: {restaurant.status}</p>
+                    <ReviewSummary target="RESTAURANT" targetId={restaurant.id}
+                      onSessionExpired={onSessionExpired} compact />
                     <button className="primary-button" type="button" onClick={() => openRestaurant(restaurant)}>Menu</button>
                     {canManage && <>
                       <button className="secondary-button" type="button" onClick={() => openRestaurant(restaurant)}>Edit menu</button>
@@ -172,7 +176,7 @@ export default function RestaurantList({ user, onSessionExpired, initialOpen = n
           </>
         )}
         {user?.role !== 'COURIER' && !(selectedRestaurant && selectedView === 'orders') && <OrderHistory
-          refreshVersion={ordersVersion} user={user} onSessionExpired={onSessionExpired} />}
+          refreshVersion={ordersVersion} user={user} onSessionExpired={onSessionExpired} restaurants={restaurants} />}
       </main>
       <footer><p>&copy; 2023 Midnight Munchies. All rights reserved.</p></footer>
     </>

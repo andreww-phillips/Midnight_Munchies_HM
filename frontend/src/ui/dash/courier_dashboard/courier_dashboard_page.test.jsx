@@ -2,14 +2,14 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { api } from '../../api';
+import { api } from '../../../api';
 import CourierDashboard from './courier_dashboard_page';
-import { CommandLogProvider } from './output_console/command_log_provider';
-import OutputConsole from './output_console/output_console';
+import { CommandLogProvider } from '../output_console/command_log_provider';
+import OutputConsole from '../output_console/output_console';
 
-vi.mock('../../api', () => ({ api: {
+vi.mock('../../../api', () => ({ api: {
   courierDashboard: vi.fn(), setCourierDuty: vi.fn(), acceptDelivery: vi.fn(), declineDelivery: vi.fn(),
-  pickUpDelivery: vi.fn(), deliverOrder: vi.fn()
+  pickUpDelivery: vi.fn(), deliverOrder: vi.fn(), courierReviews: vi.fn()
 } }));
 
 function snapshot(state = 'IDLE', assignmentStatus = 'OFFERED', orderStatus = 'READY') {
@@ -36,6 +36,8 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   api.courierDashboard.mockResolvedValue(snapshot());
+  api.courierReviews.mockResolvedValue({ targetId: 'courier-1', averageRating: 4.5, reviewCount: 1,
+    reviews: [{ rating: 5, text: 'Great courier!', createdAt: '2026-11-20T12:00:00Z' }] });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -46,6 +48,16 @@ afterEach(async () => {
   container.remove();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+it('shows courier reviews near the top of the dashboard', async () => {
+  const user = { id: 'courier-1', role: 'COURIER' };
+  await render({ user });
+
+  expect(api.courierReviews).toHaveBeenCalledWith(user.id);
+  expect(container.textContent).toContain('Great courier!');
+  expect(container.textContent.indexOf('Courier reviews'))
+    .toBeLessThan(container.textContent.indexOf('Status:'));
 });
 
 it.each([

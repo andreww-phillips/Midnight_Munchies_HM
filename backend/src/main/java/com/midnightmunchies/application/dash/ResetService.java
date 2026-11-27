@@ -8,6 +8,7 @@ import com.midnightmunchies.application.reg.AuthenticationRequiredException;
 import com.midnightmunchies.application.reg.SessionService;
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
+import com.midnightmunchies.technicalservices.ReviewRepository;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Service;
 
@@ -20,14 +21,16 @@ public class ResetService {
     private final CourierService delivery;
     private final OrderLedgerService pricing;
     private final SessionService sessions;
+    private final ReviewRepository reviews;
 
     public ResetService(SimulationAccess access, Optional<OrdResetService> orders, CourierService delivery,
-                        OrderLedgerService pricing, SessionService sessions) {
+                        OrderLedgerService pricing, SessionService sessions, ReviewRepository reviews) {
         this.access = access;
         this.orders = orders;
         this.delivery = delivery;
         this.pricing = pricing;
         this.sessions = sessions;
+        this.reviews = reviews;
     }
 
     public ResetResult resetToInitialState(HttpSession session) {
@@ -43,6 +46,7 @@ public class ResetService {
                 access.requireRecovery();
                 ord.resetToInitialState();
                 pricing.resetToInitialState();
+                reviews.clear();
                 sessions.resetToInitialState();
                 access.restored();
                 return new ResetResult("RESET", access.revision(), "Initial simulator state restored.");

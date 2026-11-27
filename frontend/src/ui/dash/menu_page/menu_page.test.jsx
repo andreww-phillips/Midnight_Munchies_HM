@@ -10,7 +10,8 @@ vi.mock("../../../api", () => ({
   api: {
     menu: vi.fn(), addMenuItem: vi.fn(), editMenuItem: vi.fn(), removeMenuItem: vi.fn(),
     changeMenuItemAvailability: vi.fn(), placeOrder: vi.fn(),
-    currentUser: vi.fn(), restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn()
+    currentUser: vi.fn(), restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn(),
+    restaurantReviews: vi.fn()
   }
 }));
 
@@ -26,6 +27,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   api.menu.mockResolvedValue([available, soldOut]);
+  api.restaurantReviews.mockResolvedValue({ targetId: restaurant.id, averageRating: null, reviewCount: 0, reviews: [] });
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);

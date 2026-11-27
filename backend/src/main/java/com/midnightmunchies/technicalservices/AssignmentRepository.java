@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Repository;
 
 import com.midnightmunchies.domain.dlv.Assignment;
+import com.midnightmunchies.domain.dlv.AssignmentStatus;
 
 @Repository
 public class AssignmentRepository {
@@ -46,6 +47,13 @@ public class AssignmentRepository {
         return assignments.values().stream()
                 .filter(Assignment::isActive)
                 .filter(assignment -> assignment.courierId().equals(courierId))
+                .findFirst();
+    }
+
+    public Optional<Assignment> findDeliveredByOrderId(UUID orderId) {
+        return assignments.values().stream()
+                .filter(assignment -> assignment.orderId().equals(orderId))
+                .filter(assignment -> assignment.status() == AssignmentStatus.DELIVERED)
                 .findFirst();
     }
 

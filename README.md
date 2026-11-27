@@ -45,6 +45,13 @@ The application now runs as an **in-memory simulator**. No Supabase account,
 Supabase entries in `frontend/.env` are not used by registration, browsing,
 menu management, or ordering.
 
+Customers can submit one 1-to-5 star rating and written review for each restaurant
+and courier on a delivered order. Restaurant ratings appear in the restaurant
+section, and the menu shows the latest review with an option to expand the full
+list. Restaurant reviews also appear below that restaurant's order history.
+Courier ratings and reviews appear in completed customer order history. Reviews
+are kept in memory and cleared when the simulator is reset.
+
 The backend defaults to `catalog.mode=memory` and seeds the local restaurant and
 menu catalog. Accounts, restaurants, menus and orders live for the lifetime of
 the backend process and reset when it restarts. Ready orders waiting for a

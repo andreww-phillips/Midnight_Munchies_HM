@@ -41,6 +41,13 @@ export const api = {
   }),
   logout: () => request("/api/auth/logout", { method: "POST" }),
   restaurants: () => request("/api/ord/restaurants"),
+  restaurantReviews: (restaurantId) => request(`/api/reviews/restaurants/${restaurantId}`),
+  courierReviews: (courierId) => request(`/api/reviews/couriers/${courierId}`),
+  orderReviews: (orderId) => request(`/api/reviews/orders/${orderId}`),
+  submitReview: (orderId, target, rating, text) => request(`/api/reviews/orders/${orderId}`, {
+    method: "POST",
+    body: JSON.stringify({ target, rating, text })
+  }),
   changeRestaurantStatus: (restaurantId, status) => request(`/api/ord/restaurants/${restaurantId}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status })

@@ -6,7 +6,7 @@ import { BAND_STYLES, COURIER_STYLES } from './map_bands';
 import SvgCityMap from './svg_city_map';
 import GoogleCityMap from './google_city_map';
 import RestaurantDetails from './restaurant_details';
-import { shortId } from '../operator_format';
+import { shortId } from '../operator_dashboard/operator_format';
 import './map_page.css';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '';

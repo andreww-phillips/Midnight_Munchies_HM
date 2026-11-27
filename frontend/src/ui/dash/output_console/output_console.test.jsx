@@ -18,7 +18,8 @@ vi.mock('../../../api', () => ({ api: {
   restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn(), preparationQueue: vi.fn(), menu: vi.fn(),
   acceptOrder: vi.fn(), rejectOrder: vi.fn(), startNextPreparation: vi.fn(), markOrderReady: vi.fn(),
   placeOrder: vi.fn(), addMenuItem: vi.fn(), editMenuItem: vi.fn(), removeMenuItem: vi.fn(),
-  changeMenuItemAvailability: vi.fn(), orderEvents: vi.fn(), operatorDeliveries: vi.fn(), reassignDelivery: vi.fn()
+  changeMenuItemAvailability: vi.fn(), orderEvents: vi.fn(), operatorDeliveries: vi.fn(), reassignDelivery: vi.fn(),
+  restaurantReviews: vi.fn()
 } }));
 
 const staff = { id: 'staff-1', role: 'RESTAURANT_STAFF', username: 'staff@example.com' };
@@ -67,6 +68,7 @@ beforeEach(() => {
   api.orderHistory.mockResolvedValue([]);
   api.preparationQueue.mockResolvedValue([]);
   api.menu.mockResolvedValue([item]);
+  api.restaurantReviews.mockResolvedValue({ averageRating: null, reviewCount: 0, reviews: [] });
   api.orderEvents.mockResolvedValue([]);
   container = document.createElement('div');
   document.body.append(container);
@@ -128,6 +130,7 @@ describe('load error logging', () => {
     api.menu.mockReturnValue(new Promise((_, fail) => { reject = fail; }));
     await renderLogged(<RestaurantMenu restaurant={restaurant} user={staff} />);
     api.menu.mockResolvedValue([]);
+    api.restaurantReviews.mockResolvedValue({ averageRating: null, reviewCount: 0, reviews: [] });
     await renderLogged(<RestaurantMenu restaurant={{ ...restaurant, id: 'other-restaurant' }} user={staff} />);
     await act(async () => reject(new Error('Old menu failure')));
     expect(entries()).toHaveLength(0);

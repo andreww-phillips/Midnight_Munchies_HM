@@ -2,9 +2,9 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../../api';
-import { CommandLogProvider } from './output_console/command_log_provider';
-import OutputConsole from './output_console/output_console';
+import { api } from '../../../api';
+import { CommandLogProvider } from '../output_console/command_log_provider';
+import OutputConsole from '../output_console/output_console';
 import OperatorDashboard from './operator_dashboard_page';
 import { formatWaiting } from './operator_format';
 

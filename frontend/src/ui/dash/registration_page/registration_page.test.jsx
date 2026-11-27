@@ -9,7 +9,7 @@ import * as commandLog from '../output_console/command_log';
 vi.mock('../../../api', () => ({ api: {
   currentUser: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(),
   restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn(), menu: vi.fn(), addMenuItem: vi.fn(), cityMap: vi.fn(), preparationQueue: vi.fn(),
-  courierDashboard: vi.fn(), operatorDeliveries: vi.fn()
+  courierDashboard: vi.fn(), operatorDeliveries: vi.fn(), restaurantReviews: vi.fn()
 } }));
 
 let container;
@@ -21,6 +21,7 @@ beforeEach(() => {
   api.restaurants.mockResolvedValue([]);
   api.orders.mockResolvedValue([]);
   api.orderHistory.mockResolvedValue([]);
+  api.restaurantReviews.mockResolvedValue({ averageRating: null, reviewCount: 0, reviews: [] });
   api.courierDashboard.mockResolvedValue({ onDuty: false, state: 'OFFLINE', assignment: null });
   api.operatorDeliveries.mockResolvedValue({ active: [], queued: [] });
   container = document.createElement('div');

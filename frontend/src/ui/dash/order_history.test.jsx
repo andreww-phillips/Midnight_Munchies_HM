@@ -9,7 +9,8 @@ import { CommandLogProvider } from './output_console/command_log_provider';
 import OutputConsole from './output_console/output_console';
 
 vi.mock('../../api', () => ({ api: {
-  orderHistory: vi.fn(), refundOrder: vi.fn(), cancelOrder: vi.fn(), orderSummary: vi.fn(), orderEvents: vi.fn(), restaurants: vi.fn()
+  orderHistory: vi.fn(), refundOrder: vi.fn(), cancelOrder: vi.fn(), orderSummary: vi.fn(), orderEvents: vi.fn(),
+  restaurants: vi.fn(), orderReviews: vi.fn(), restaurantReviews: vi.fn()
 } }));
 
 const customer = { id: 'customer-1', role: 'CUSTOMER' };
@@ -32,6 +33,8 @@ beforeEach(() => {
   api.orderSummary.mockResolvedValue(summary);
   api.orderEvents.mockResolvedValue([]);
   api.restaurants.mockResolvedValue([]);
+  api.orderReviews.mockResolvedValue({ eligible: false });
+  api.restaurantReviews.mockResolvedValue({ averageRating: null, reviewCount: 0, reviews: [] });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -43,8 +46,8 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-async function render(user = customer) {
-  await act(async () => root.render(<OrderHistory user={user} refreshVersion={0} />));
+async function render(user = customer, props = {}) {
+  await act(async () => root.render(<OrderHistory user={user} refreshVersion={0} {...props} />));
 }
 
 async function click(label) {
@@ -63,6 +66,43 @@ it('adds a delivery summary while preserving the existing order card and event h
   await click('View event history');
   expect(api.orderEvents).toHaveBeenCalledWith(order.orderId);
   expect(container.textContent).toContain('No recorded transitions yet.');
+});
+
+it('shows restaurant reviews below staff order history, grouped by restaurant', async () => {
+  const staffOrders = [
+    { ...order, orderId: 'restaurant-order-1', restaurantId: 'restaurant-1' },
+    { ...order, orderId: 'restaurant-order-2', restaurantId: 'restaurant-2' }
+  ];
+  api.orderHistory.mockResolvedValue(staffOrders);
+  api.restaurantReviews.mockImplementation(async (restaurantId) => ({
+    targetId: restaurantId, averageRating: 4.5, reviewCount: 1,
+    reviews: [{ orderId: `review-${restaurantId}`, targetId: restaurantId, rating: 5,
+      text: `Review for ${restaurantId}`, createdAt: '2026-11-20T12:00:00Z' }]
+  }));
+  const staff = { id: 'staff-1', role: 'RESTAURANT_STAFF' };
+
+  await render(staff, { restaurants: [
+    { id: 'restaurant-1', name: 'Diner One' }, { id: 'restaurant-2', name: 'Diner Two' }
+  ] });
+
+  expect(container.textContent).toContain('Restaurant order history');
+  expect(container.textContent).toContain('Diner One reviews');
+  expect(container.textContent).toContain('Diner Two reviews');
+  expect(container.textContent).toContain('Review for restaurant-1');
+  expect(container.textContent).toContain('Review for restaurant-2');
+  expect(api.restaurantReviews).toHaveBeenCalledTimes(2);
+});
+
+it('loads restaurant names when restaurant staff open order history directly', async () => {
+  api.orderHistory.mockResolvedValue([order]);
+  api.restaurants.mockResolvedValue([{ id: order.restaurantId, name: 'Diner One' }]);
+  const staff = { id: 'staff-1', role: 'RESTAURANT_STAFF' };
+
+  await render(staff);
+
+  expect(api.restaurants).toHaveBeenCalledTimes(1);
+  expect(container.textContent).toContain('Diner One reviews');
+  expect(container.textContent).not.toContain('Restaurant restaurant-1 reviews');
 });
 
 it.each(['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'PICKED_UP', 'REJECTED', 'CANCELLED'])

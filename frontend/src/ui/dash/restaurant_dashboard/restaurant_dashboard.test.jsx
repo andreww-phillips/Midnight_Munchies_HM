@@ -8,7 +8,8 @@ import RegistrationPage from '../registration_page/registration_page';
 
 vi.mock('../../../api', () => ({ api: {
   currentUser: vi.fn(), restaurants: vi.fn(), orders: vi.fn(), orderHistory: vi.fn(), preparationQueue: vi.fn(), menu: vi.fn(),
-  acceptOrder: vi.fn(), rejectOrder: vi.fn(), startNextPreparation: vi.fn(), markOrderReady: vi.fn()
+  acceptOrder: vi.fn(), rejectOrder: vi.fn(), startNextPreparation: vi.fn(), markOrderReady: vi.fn(),
+  restaurantReviews: vi.fn()
 } }));
 
 const restaurant = { id: 'restaurant-1', ownerId: 'staff-1', name: 'Bobs Burgers' };
@@ -40,6 +41,7 @@ beforeEach(() => {
   api.orderHistory.mockResolvedValue([]);
   api.preparationQueue.mockResolvedValue([]);
   api.menu.mockResolvedValue([]);
+  api.restaurantReviews.mockResolvedValue({ averageRating: null, reviewCount: 0, reviews: [] });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -52,6 +54,22 @@ afterEach(async () => {
 });
 
 describe('restaurant order viewing', () => {
+  it('displays the restaurant review feed after its order history', async () => {
+    api.orders.mockResolvedValue([order('delivered', 'DELIVERED')]);
+    api.restaurantReviews.mockResolvedValue({
+      targetId: restaurant.id, averageRating: 4.5, reviewCount: 2,
+      reviews: [{ orderId: 'review-order', targetId: restaurant.id, rating: 5,
+        text: 'Excellent burgers.', createdAt: '2026-11-20T12:00:00Z' }]
+    });
+
+    await renderDashboard();
+
+    expect(api.restaurantReviews).toHaveBeenCalledWith(restaurant.id);
+    expect(container.textContent).toContain('Restaurant reviews');
+    expect(container.textContent).toContain('4.5 / 5');
+    expect(container.textContent).toContain('Excellent burgers.');
+  });
+
   it('groups restaurant orders by status and displays snapshots and rejection reasons', async () => {
     api.orders.mockResolvedValue([
       order('incoming'), order('cooking', 'PREPARING'), order('pickup', 'READY'),

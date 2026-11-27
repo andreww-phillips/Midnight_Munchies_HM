@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../../api';
-import { formatPrice } from './menu_page/menu_format';
-import { useCommandLog } from './output_console/command_log';
+import { api } from '../../../api';
+import { formatPrice } from '../menu_page/menu_format';
+import { useCommandLog } from '../output_console/command_log';
+import { ReviewSummary } from '../reviews';
 import './courier_dashboard_page.css';
 
 function availableActions(dashboard) {
@@ -50,7 +51,7 @@ function DeliveryCard({ assignment, onAction, busy, allowed }) {
   );
 }
 
-export default function CourierDashboard({ onSessionExpired }) {
+export default function CourierDashboard({ user, onSessionExpired }) {
   const { record } = useCommandLog();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -160,6 +161,7 @@ export default function CourierDashboard({ onSessionExpired }) {
           {dashboard?.onDuty ? 'Go off duty' : 'Go on duty'}
         </button>
       </div>
+      <ReviewSummary target="COURIER" targetId={user?.id} onSessionExpired={onSessionExpired} />
       {loading && !dashboard && <p role="status">Loading courier status...</p>}
       {error && <p role="alert">{error}</p>}
       {dashboard && (

@@ -6,6 +6,7 @@ import com.midnightmunchies.application.ord.OrdResetService;
 import com.midnightmunchies.application.prc.OrderLedgerService;
 import com.midnightmunchies.application.reg.AuthenticationRequiredException;
 import com.midnightmunchies.application.reg.SessionService;
+import com.midnightmunchies.technicalservices.ReviewRepository;
 import com.midnightmunchies.domain.reg.UserAccount;
 import com.midnightmunchies.domain.reg.UserRole;
 import jakarta.servlet.http.HttpSession;
@@ -32,15 +33,17 @@ class ResetServiceTests {
     private final CourierService delivery = mock(CourierService.class);
     private final OrderLedgerService pricing = mock(OrderLedgerService.class);
     private final SessionService sessions = mock(SessionService.class);
-    private final ResetService service = new ResetService(access, Optional.of(orders), delivery, pricing, sessions);
+    private final ReviewRepository reviews = mock(ReviewRepository.class);
+    private final ResetService service = new ResetService(access, Optional.of(orders), delivery, pricing, sessions, reviews);
 
     @Test
     void resetsAllModulesInOrderAndReturnsAnIncreasingRevision() {
         var first = service.resetToInitialState(session(UserRole.PLATFORM_OPERATOR));
-        var sequence = inOrder(delivery, orders, pricing, sessions);
+        var sequence = inOrder(delivery, orders, pricing, reviews, sessions);
         sequence.verify(delivery).resetToInitialState();
         sequence.verify(orders).resetToInitialState();
         sequence.verify(pricing).resetToInitialState();
+        sequence.verify(reviews).clear();
         sequence.verify(sessions).resetToInitialState();
         var second = service.resetToInitialState(session(UserRole.PLATFORM_OPERATOR));
         assertEquals("RESET", first.status());
@@ -52,7 +55,7 @@ class ResetServiceTests {
     @EnumSource(value = UserRole.class, names = "PLATFORM_OPERATOR", mode = EnumSource.Mode.EXCLUDE)
     void deniedRolesCannotStartResetOrChangeState(UserRole role) {
         assertThrows(AuthorizationException.class, () -> service.resetToInitialState(session(role)));
-        verifyNoInteractions(delivery, orders, pricing, sessions);
+        verifyNoInteractions(delivery, orders, pricing, reviews, sessions);
         assertAvailable();
     }
 
@@ -63,7 +66,7 @@ class ResetServiceTests {
         MockHttpSession expired = session(UserRole.PLATFORM_OPERATOR);
         expired.invalidate();
         assertThrows(AuthenticationRequiredException.class, () -> service.resetToInitialState(expired));
-        verifyNoInteractions(delivery, orders, pricing, sessions);
+        verifyNoInteractions(delivery, orders, pricing, reviews, sessions);
     }
 
     @Test
@@ -72,16 +75,16 @@ class ResetServiceTests {
         when(expiring.getAttribute("authenticatedUser"))
                 .thenReturn(account(UserRole.PLATFORM_OPERATOR)).thenReturn(null);
         assertThrows(AuthenticationRequiredException.class, () -> service.resetToInitialState(expiring));
-        verifyNoInteractions(delivery, orders, pricing, sessions);
+        verifyNoInteractions(delivery, orders, pricing, reviews, sessions);
         assertAvailable();
     }
 
     @Test
     void unsupportedCatalogModeDoesNotResetOtherModules() {
-        ResetService unsupported = new ResetService(access, Optional.empty(), delivery, pricing, sessions);
+        ResetService unsupported = new ResetService(access, Optional.empty(), delivery, pricing, sessions, reviews);
         assertThrows(UnsupportedOperationException.class,
                 () -> unsupported.resetToInitialState(session(UserRole.PLATFORM_OPERATOR)));
-        verifyNoInteractions(delivery, orders, pricing, sessions);
+        verifyNoInteractions(delivery, orders, pricing, reviews, sessions);
         assertAvailable();
     }
 
@@ -92,7 +95,7 @@ class ResetServiceTests {
         var failure = assertThrows(ResetService.ResetFailedException.class,
                 () -> service.resetToInitialState(session(UserRole.PLATFORM_OPERATOR)));
         assertSame(diskFailure, failure.getCause());
-        verifyNoInteractions(orders, pricing, sessions);
+        verifyNoInteractions(orders, pricing, reviews, sessions);
         assertAvailable();
     }
 
@@ -129,7 +132,7 @@ class ResetServiceTests {
             try {
                 assertTrue(submitted.await(5, TimeUnit.SECONDS));
                 assertThrows(TimeoutException.class, () -> result.get(100, TimeUnit.MILLISECONDS));
-                verifyNoInteractions(delivery, orders, pricing, sessions);
+                verifyNoInteractions(delivery, orders, pricing, reviews, sessions);
             } finally {
                 existingRequest.unlock();
             }
